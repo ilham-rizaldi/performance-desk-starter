@@ -10,8 +10,11 @@ const day = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(valu
 const dateString = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
 export const timezone = dateString.resolvedOptions().timeZone;
 
-export function dateRange(now = new Date()) {
-  const parts = Object.fromEntries(dateString.formatToParts(now).map(p => [p.type, p.value]));
+export function dateRange(now = new Date(), timeZone = timezone) {
+  const formatter = timeZone === timezone ? dateString : new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(now).map(p => [p.type, p.value]));
   const reportDate = [parts.year, parts.month, parts.day].join("-");
   const oldest = new Date(Date.parse(reportDate) - 41 * 86400000).toISOString().slice(0, 10);
   return { oldest, reportDate };
@@ -127,8 +130,8 @@ function matchActivities(garminRows, intervalsRows) {
   });
 }
 
-export function buildReport(cache, now = new Date()) {
-  const { oldest, reportDate } = dateRange(now);
+export function buildReport(cache, now = new Date(), timeZone = timezone) {
+  const { oldest, reportDate } = dateRange(now, timeZone);
   const included = row => row.date >= oldest && row.date <= reportDate;
   const getActivities = name => (cache.get(name)?.activities ?? []).filter(included);
   const activities = matchActivities(getActivities("garmin"), getActivities("intervals"));
@@ -138,7 +141,7 @@ export function buildReport(cache, now = new Date()) {
   }));
   const garminSessions = new Set(efforts.filter(row => row.source === sources.garmin && row.sessionKey).map(row => row.sessionKey));
   return {
-    version: 1, reportDate, timezone,
+    version: 1, reportDate, timezone: timeZone,
     wellness: [...cache.values()].flatMap(item => item.wellness).filter(included),
     activities,
     efforts: efforts.filter(row => row.source === sources.garmin || !garminSessions.has(row.sessionKey)),
@@ -175,8 +178,8 @@ async function collectEfforts(candidates, previous, notices, load) {
 const eligibleActivity = (row, oldest, newest) => row.date >= oldest && row.date <= newest
   && row.minutes >= 13 && Number.isFinite(row.start) && ["Cycling", "Running"].includes(row.sport);
 
-export async function syncGarmin(auth, now, request = fetch, previous) {
-  const { oldest, reportDate } = dateRange(now);
+export async function syncGarmin(auth, now, request = fetch, previous, { timeZone, includeEfforts = true } = {}) {
+  const { oldest, reportDate } = dateRange(now, timeZone);
   const issued = await read(garmin + "/personalapitoken-service/personal-api/personal-api-key/token",
     { method: "POST", headers: { Accept: "*/*", Authorization: "ApiKey " + auth.value } }, request, "text");
   const token = issued?.trim();
@@ -230,18 +233,18 @@ export async function syncGarmin(auth, now, request = fetch, previous) {
     if (start === 400) notices.push("Garmin activity limit reached. The range is partial.");
   }
   const candidates = activities.filter(row => eligibleActivity(row, oldest, reportDate) && /^\d+$/.test(row.id));
-  const recording = await collectEfforts(candidates, previous, notices, async row => {
+  const recording = includeEfforts ? await collectEfforts(candidates, previous, notices, async row => {
     const file = await read(garmin + "/download-service/files/activity/" + row.id,
       { headers: { Authorization: "Bearer " + token, Accept: "*/*" } }, request, "binary");
     return file ? fitEfforts(row, file) : [];
-  });
+  }) : { blocksByActivity: new Map() };
   return { wellness: [...byDate.values()], activities, ...recording, notices: [...new Set(notices)],
     efforts: [...recording.blocksByActivity.values()].flat() };
 }
 
-export async function syncIntervals(auth, now, request = fetch, previous) {
-  const { oldest, reportDate } = dateRange(now);
-  const Authorization = auth.kind === "oauth" ? "Bearer " + auth.value : "Basic " + Buffer.from("API_KEY:" + auth.value).toString("base64");
+export async function syncIntervals(auth, now, request = fetch, previous, { timeZone, includeEfforts = true } = {}) {
+  const { oldest, reportDate } = dateRange(now, timeZone);
+  const Authorization = auth.kind === "oauth" ? "Bearer " + auth.value : "Basic " + btoa("API_KEY:" + auth.value);
   const get = (path, params = {}) => read(intervals + "/api/v1/" + path + "?" + new URLSearchParams(params),
     { headers: { Authorization } }, request);
   const range = { oldest, newest: reportDate };
@@ -251,10 +254,10 @@ export async function syncIntervals(auth, now, request = fetch, previous) {
   const eligible = new Set(activityRows.filter(row => sportType(row.type) === "Running" || row.device_watts === true).map(row => String(row.id)));
   const candidates = activities.filter(row => eligibleActivity(row, oldest, reportDate) && row.environment && eligible.has(row.id));
   const notices = [];
-  let { blocksByActivity, streamsRetryAt } = await collectEfforts(candidates, previous, notices, async row => {
+  let { blocksByActivity, streamsRetryAt } = includeEfforts ? await collectEfforts(candidates, previous, notices, async row => {
     const types = "time,heartrate," + (row.sport === "Cycling" ? "watts" : "velocity_smooth");
     return steadyEfforts(row, await get("activity/" + encodeURIComponent(row.id) + "/streams.json", { types }));
-  });
+  }) : { blocksByActivity: new Map(), streamsRetryAt: 0 };
   let calendar = previous?.calendar?.filter(row => row.date >= reportDate) ?? [];
   if (auth.kind === "key" && Date.now() >= streamsRetryAt) {
     try {

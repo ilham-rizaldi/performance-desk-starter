@@ -450,14 +450,14 @@
     if (report) date.dateTime = report.date;
     else date.removeAttribute("datetime");
     content.append(...panels.daily());
-    const workout = adaptive.daily();
+    const workout = adaptive?.daily();
     if (workout) content.append(workout);
   }
 
   function showTrends() {
     const list = element("trends-content");
     list.replaceChildren(...panels.trends());
-    const review = adaptive.trends();
+    const review = adaptive?.trends();
     if (review) list.append(review);
     const sessions = (report?.activities ?? []).filter(row => row.sport === "Strength");
     const recorded = sessions.filter(row => row.liftedKg != null);
@@ -517,8 +517,9 @@
 
   const panels = globalThis.PerformancePanels({ node, card, fmt, graphic, metric, valuesFor, showHistory, detailsButton,
     getReport: () => report, currentDate: model.currentDate, colors: metricColors });
-  const adaptive = globalThis.PerformanceAdaptive({ node, card, fmt, graphic, detailsButton,
-    getReport: () => report, canSave: () => Boolean(report) });
+  const adaptive = location.protocol === "http:" && location.hostname === "127.0.0.1"
+    ? globalThis.PerformanceAdaptive({ node, card, fmt, graphic, detailsButton, getReport: () => report, canSave: () => Boolean(report) })
+    : null;
 
   const viewButtons = [...document.querySelectorAll("[data-view]")];
   const referenceButton = viewButtons.find(button => button.dataset.view === "reference");

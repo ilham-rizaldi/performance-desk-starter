@@ -1,24 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
+import { mergeRows } from "./reference-data.mjs";
+export { combineReference } from "./reference-data.mjs";
 
 const garmin = "Garmin Connect", intervals = "Intervals.icu";
 const sport = { Ride: "Cycling", Run: "Running", "Weight Training": "Strength" };
 const environment = { indoor: "Indoor", outdoor: "Outdoor" };
 const minutes = value => Number.isFinite(value) ? value / 60 : undefined;
 const wellnessKey = row => [row.source, row.date].join("|");
-const activityKey = row => [row.source, row.id].join("|");
-const pairs = fields => Object.entries(fields).filter(([, value]) => value != null);
-
-function mergeRows(older, newer, key) {
-  const rows = new Map(older.map(row => [key(row), row]));
-  for (const row of newer) {
-    const id = key(row);
-    rows.set(id, { ...rows.get(id), ...Object.fromEntries(pairs(row)) });
-  }
-  return [...rows.values()];
-}
-
 export function projectReference(original) {
   if (original?.schemaVersion !== 1 || !/^\d{4}-\d{2}-\d{2}$/.test(original.date ?? "")) {
     throw Error("Choose a verified Performance Desk archive.");
@@ -67,7 +57,10 @@ export function projectReference(original) {
     .map(row => ({ date: row.date, source: garmin, sport: sport[row.sport], environment: environment[row.environment],
       activityId: row.activityId == null ? undefined : String(row.activityId), offsetSeconds: row.startSeconds,
       minutes: minutes(row.durationSeconds), bpm: row.hrBpm, peakHR: row.peakHrBpm, watts: row.powerWatts, paceSeconds: row.paceSecondsPerKm }));
-  const recoveryObservedAt = (original.sources ?? []).find(row => row.name === garmin || row.source === garmin)?.observedAt;
+  const deviceUpdate = w.readinessUpdatedAtLocal;
+  const recoveryObservedAt = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(deviceUpdate)
+    ? `${latest.date}T${deviceUpdate}:00+07:00`
+    : w.provenance?.datedRecovery?.readiness?.observedAt;
   const context = { date: original.date, capturedAt: original.capturedAt, recoveryObservedAt,
     sleep: { date: latest.date, bed: w.bedTimeLocal, wake: w.wakeTimeLocal, deep: w.deepSleepMinutes, light: w.lightSleepMinutes,
       rem: w.remSleepMinutes, awake: w.awakeMinutes, score: w.sleepScore, need: w.sleepNeedMinutes,
@@ -97,21 +90,6 @@ export function projectReference(original) {
   };
   const wellness = [history, loads, status, vo2, [latest], fitness].reduce((left, right) => mergeRows(left, right, wellnessKey), []);
   return { version: 1, reportDate: original.date, wellness, activities, efforts, context };
-}
-
-export function combineReference(live, reference, activeSources) {
-  if (!reference || reference.version !== 1) return live;
-  const available = row => activeSources.includes(row.source) && row.date <= live.reportDate;
-  const garminAvailable = activeSources.includes(garmin) && reference.reportDate <= live.reportDate;
-  const effortKey = row => [row.source, row.activityId].join("|");
-  const liveActivityEfforts = new Set(live.efforts.filter(row => row.activityId).map(effortKey));
-  return {
-    ...live,
-    wellness: mergeRows((reference.wellness ?? []).filter(available), live.wellness, wellnessKey),
-    activities: mergeRows((reference.activities ?? []).filter(available), live.activities, activityKey),
-    efforts: [...(reference.efforts ?? []).filter(row => available(row) && !liveActivityEfforts.has(effortKey(row))), ...live.efforts],
-    context: garminAvailable ? reference.context : undefined,
-  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

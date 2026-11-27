@@ -1,6 +1,11 @@
 (() => {
   "use strict";
   const local = location.protocol === "http:" && location.hostname === "127.0.0.1";
+  const hosted = location.origin === "https://ilham-rizaldi.github.io"
+    && location.pathname.startsWith("/performance-desk-starter/");
+  const hostedEndpoint = "https://performance-desk-report.ilhamngeprint.chatgpt.site/api/starter";
+  const fragmentToken = hosted ? new URLSearchParams(location.hash.slice(1)).get("live") : null;
+  let hostedToken = /^[A-Za-z0-9_-]{43}$/.test(fragmentToken ?? "") ? fragmentToken : null;
   const dialog = document.getElementById("connections");
   const cards = document.getElementById("connection-cards");
   const note = document.getElementById("connection-status");
@@ -9,6 +14,8 @@
   const syncButton = document.getElementById("sync-now");
   const headerSync = document.getElementById("header-sync");
   const headerStatus = document.getElementById("header-sync-status");
+  const lock = document.getElementById("lock-live");
+  lock.hidden = !hostedToken;
   const keyPages = { garmin: "https://connect.garmin.com/app/settings/personalApiToken",
     intervals: "https://intervals.icu/settings" };
   const keyLabels = { garmin: "Garmin Personal API key", intervals: "Intervals.icu API key" };
@@ -42,7 +49,10 @@
       options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(data);
     }
-    const response = await fetch(path, options);
+    const response = hosted
+      ? await fetch(hostedEndpoint, { method: data === undefined ? "GET" : "POST", cache: "no-store",
+        credentials: "omit", redirect: "error", headers: { Authorization: "Bearer " + hostedToken }, signal: AbortSignal.timeout(45000) })
+      : await fetch(path, options);
     const result = await response.json();
     if (!response.ok) throw Error(result.error || "Could not reach the local connection.");
     return result;
@@ -92,15 +102,17 @@
         ? source.lastSync ? "Last synced " + new Date(source.lastSync).toLocaleString() : "Waiting for first sync" : "Ready to connect"));
       if (source.error) card.append(node("p", source.error));
       for (const detail of source.notices) card.append(node("p", detail));
-      const connect = button(source.connected ? "Reconnect" : "Connect", () => {
-        if (source.oauth) void act(async () => { location.assign((await api("/api/intervals/authorize", {})).url); });
-        else showKey(source);
-      });
-      connect.dataset.connection = source.id;
-      connect.setAttribute("aria-label", connect.textContent + " " + source.name);
-      card.append(connect);
-      if (source.oauth) card.append(button("Use personal key", () => showKey(source)));
-      if (source.connected) card.append(button("Disconnect", () => act(async () => show(await api("/api/" + source.id + "/disconnect", {})))));
+      if (local) {
+        const connect = button(source.connected ? "Reconnect" : "Connect", () => {
+          if (source.oauth) void act(async () => { location.assign((await api("/api/intervals/authorize", {})).url); });
+          else showKey(source);
+        });
+        connect.dataset.connection = source.id;
+        connect.setAttribute("aria-label", connect.textContent + " " + source.name);
+        card.append(connect);
+        if (source.oauth) card.append(button("Use personal key", () => showKey(source)));
+        if (source.connected) card.append(button("Disconnect", () => act(async () => show(await api("/api/" + source.id + "/disconnect", {})))));
+      }
       elements.push(card);
     }
     cards.replaceChildren(...elements);
@@ -109,18 +121,23 @@
   }
 
   async function check() {
-    if (updating) return;
+    if (updating || (!local && !hostedToken)) return;
     try {
       const state = await api("/api/state");
+      if (hosted && !hostedToken) return;
+      if (hosted && !current?.report) headerStatus.textContent = state.report ? "" : "Waiting for the first private sync.";
       if (JSON.stringify(state) !== JSON.stringify(current)) show(state);
-    } catch { if (dialog.open) note.textContent = "The local app is unavailable. Start it again and reopen this page."; }
+    } catch {
+      if (hosted && hostedToken) headerStatus.textContent = "Could not open the private dashboard. Check your bookmark and try again.";
+      if (dialog.open) note.textContent = local ? "The local app is unavailable. Start it again and reopen this page." : headerStatus.textContent;
+    }
   }
 
   document.getElementById("show-connections").addEventListener("click", () => {
     dialog.showModal();
-    if (local) void check();
+    if (local || hostedToken) void check();
     else {
-      const status = node("p", "Automatic sync runs in your private app.");
+      const status = node("p", "Open your private bookmark to view live data, or connect your own accounts in the local app.");
       cards.replaceChildren(status, link("Open private app", "http://127.0.0.1:4176/"), link("Set up automatic sync", "https://github.com/ilham-rizaldi/performance-desk-starter/blob/main/SYNC.md"));
     }
   });
@@ -143,6 +160,7 @@
     const before = new Map(current.connections.map(source => [source.id, source.lastSync]));
     try {
       const state = await api("/api/sync", {});
+      if (hosted && !hostedToken) return;
       show(state);
       const connected = state.connections.filter(source => source.connected);
       feedback.textContent = connected.some(source => source.error) ? "Some data could not sync. Check Connect accounts for details."
@@ -153,7 +171,23 @@
   }
   syncButton.addEventListener("click", () => syncNow(note));
   headerSync.addEventListener("click", () => syncNow(headerStatus));
-  if (local) {
+  lock.addEventListener("click", () => {
+    hostedToken = null;
+    history.replaceState(null, "", location.pathname + location.search);
+    lock.hidden = true;
+    show({ report: null, connections: [] });
+    headerStatus.textContent = "Desk locked. Reopen your private bookmark for live data.";
+    if (dialog.open) dialog.close();
+  });
+  if (local || hostedToken) {
+    if (hostedToken) {
+      headerStatus.textContent = "Opening your private Performance Desk…";
+      document.querySelector(".brand").addEventListener("click", event => {
+        if (!hostedToken) return;
+        event.preventDefault();
+        document.querySelector('[data-view="daily"]').click();
+      });
+    }
     void check();
     setInterval(check, 30000);
   }

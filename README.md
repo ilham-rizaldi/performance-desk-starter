@@ -2,7 +2,13 @@
 
 Performance Desk combines Garmin Connect and Intervals.icu data into a personal training dashboard. See how your load and recovery are changing, choose an easy session, and compare your estimated heart rate with what you actually recorded.
 
-[Copy the install prompt for Codex](SETUP-PROMPT.md) · [Connection and troubleshooting guide](SYNC.md) · [Open the GitHub Pages preview](https://ilham-rizaldi.github.io/performance-desk-starter/)
+[Open Performance Desk](https://ilham-rizaldi.github.io/performance-desk-starter/) · [Local install prompt](SETUP-PROMPT.md) · [Connection guide](SYNC.md)
+
+## Live dashboard
+
+The GitHub Pages URL is the main dashboard. The owner’s private bookmark opens the live Garmin Connect and Intervals.icu data on that page. The public page opens without personal readings. Keep the private bookmark in your browser or password manager, and use **Lock** when you finish on a shared device.
+
+The private backend checks Garmin hourly and Intervals.icu every 15 minutes while the dashboard is open. **Sync now** requests an earlier refresh when the service allows it. Imported archive readings keep their original dates. The local installation below is available for anyone who wants to connect their own accounts.
 
 ## Easiest install with Codex
 
@@ -42,6 +48,6 @@ Choose **Details** on a card for a closer look. **Historical data** opens the ta
 
 ## Preview, files, and privacy
 
-The [GitHub Pages preview](https://ilham-rizaldi.github.io/performance-desk-starter/) opens the public dashboard shell. Run the local app to connect your accounts, see your reports, and use Adaptive Workout. If you have an older private archive, the [connection guide](SYNC.md#use-an-existing-private-archive) explains how to add it to your local app.
+The public GitHub Pages shell holds no credentials or personal data. Run the local app to connect your own accounts and use Adaptive Workout. If you have an older private archive, the [connection guide](SYNC.md#use-an-existing-private-archive) explains how to add it to your local app.
 
-Your account keys, synced data, and private archive stay with your local app. Saved workout targets and reviews stay in the browser where you saved them. The app reads your accounts. You can remove a connection with **Disconnect**. [How to connect and disconnect](SYNC.md)
+For local installs, account keys, synced data, and archived readings stay with your local app. Saved workout targets and reviews stay in the browser where you saved them. You can remove a local connection with **Disconnect**. [How to connect and disconnect](SYNC.md)
