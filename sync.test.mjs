@@ -74,6 +74,13 @@ test("builds a dated report with matched sessions, restricted activity sources a
   assert.equal(i.wellness[0].form, -5);
   assert.equal(report.activities.length, 2);
   assert.equal(report.activities[0].sessionKey, report.activities[1].sessionKey);
+  const merged = globalThis.PerformanceData.normalize(report).activities;
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].avgHR, 130);
+  assert.deepEqual(merged[0].sourceReadings, [
+    { source: "Garmin Connect", id: "41", minutes: 60, km: 24, avgWatts: 115, avgHR: null, timeBasis: "duration" },
+    { source: "Intervals.icu", id: "g99", minutes: 3590 / 60, km: 24.01, avgWatts: null, avgHR: 130, timeBasis: "moving" },
+  ]);
   assert.deepEqual(report.efforts, []);
 });
 
@@ -145,7 +152,7 @@ test("sync extracts paired streams once and keeps measured ceiling time", async 
 });
 
 test("workout forecast uses earlier days only and blocks stale recovery decisions", () => {
-  const { workoutForecast, workoutAdjustment } = globalThis.PerformanceData;
+  const { workoutForecast, workoutAdjustment, recoveryAssessment } = globalThis.PerformanceData;
   const plan = { date: "2026-11-27", sport: "Running", environment: "Outdoor", target: 600 };
   const block = { sport: "Running", environment: "Outdoor", minutes: 8 };
   const efforts = [
@@ -155,9 +162,42 @@ test("workout forecast uses earlier days only and blocks stale recovery decision
     { ...block, date: "2026-11-26", effort: 600, bpm: 190, environment: "Indoor" },
   ];
   assert.equal(workoutForecast(efforts, plan).bpm, 132);
-  const data = { date: plan.date, wellness: [{ date: plan.date, source: "Garmin Connect", readiness: 32, recoveryHours: 14 }] };
+  const data = { date: plan.date, wellness: [
+    { date: "2026-11-25", source: "Garmin Connect", readiness: 82, recoveryHours: 1 },
+    { date: "2026-11-26", source: "Garmin Connect", readiness: 18, recoveryHours: 29 },
+    { date: plan.date, source: "Garmin Connect", readiness: 32, recoveryHours: 14 },
+  ] };
   assert.equal(workoutAdjustment(data, plan.date, 40).minutes, 25);
   assert.equal(workoutAdjustment(data, "2026-11-28", 40).minutes, null);
+  assert.equal(recoveryAssessment(data, "2026-11-25").level, "start");
+  assert.deepEqual(recoveryAssessment(data, "2026-11-26").reasons, ["readiness", "timer"]);
+  assert.equal(recoveryAssessment(data, "2026-11-26").level, "rest");
+  assert.equal(recoveryAssessment(data, plan.date).level, "easy");
+  assert.equal(recoveryAssessment(data, "2026-11-24").level, "partial");
+});
+
+test("coaching combines dated load, Form and HRV without changing the rest or missing-data guardrails", () => {
+  const { trainingAssessment, workoutAdjustment } = globalThis.PerformanceData;
+  const earlier = "2026-11-25", middle = "2026-11-26", latest = "2026-11-27";
+  const recovery = { source: "Garmin Connect", readiness: 83, recoveryHours: 1, optimalLow: 300, optimalHigh: 600 };
+  const data = { date: latest, wellness: [
+    { ...recovery, date: earlier, acuteLoad: 650 },
+    { ...recovery, date: middle, acuteLoad: 500, hrvStatus: "Unbalanced" },
+    { date: middle, source: "Intervals.icu", form: -31 },
+    { ...recovery, date: latest, acuteLoad: 528, hrvStatus: "Balanced" },
+    { date: latest, source: "Intervals.icu", form: -11.3 },
+  ] };
+  assert.deepEqual(trainingAssessment(data, earlier).cautions, ["Acute Load was above your personal range."]);
+  assert.equal(trainingAssessment(data, middle).level, "easy");
+  assert.equal(trainingAssessment(data, middle).cautions.length, 2);
+  assert.equal(trainingAssessment(data, latest).level, "start");
+  assert.equal(workoutAdjustment(data, latest, 40).minutes, 40);
+  data.wellness[3].readiness = 18;
+  assert.equal(trainingAssessment(data, latest).level, "rest");
+  assert.equal(workoutAdjustment(data, latest, 40).minutes, null);
+  data.wellness[3].readiness = null;
+  data.wellness[3].recoveryHours = null;
+  assert.equal(trainingAssessment(data, latest).level, "partial");
 });
 
 test("weekly progress matches HR bands and a gentler target needs measured peaks", () => {

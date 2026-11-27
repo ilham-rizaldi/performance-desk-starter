@@ -7,6 +7,8 @@
   const keyForm = document.getElementById("key-form");
   const keyInput = document.getElementById("source-key");
   const syncButton = document.getElementById("sync-now");
+  const headerSync = document.getElementById("header-sync");
+  const headerStatus = document.getElementById("header-sync-status");
   const keyPages = { garmin: "https://connect.garmin.com/app/settings/personalApiToken",
     intervals: "https://intervals.icu/settings" };
   const keyLabels = { garmin: "Garmin Personal API key", intervals: "Intervals.icu API key" };
@@ -61,7 +63,17 @@
     note.textContent = "Working…";
     try { await task(); note.textContent = ""; }
     catch (error) { note.textContent = error.message; }
-    finally { updating = false; }
+    finally { updating = false; syncControls(); }
+  }
+
+  function syncControls() {
+    const connected = current?.connections?.filter(source => source.connected) ?? [];
+    for (const button of [headerSync, syncButton]) {
+      button.hidden = !connected.length;
+      button.disabled = updating || connected.some(source => source.syncing);
+      button.textContent = button.disabled ? "Syncing…" : "Sync now";
+    }
+    if (!connected.length) headerStatus.textContent = "";
   }
 
   function show(state) {
@@ -93,7 +105,7 @@
     }
     cards.replaceChildren(...elements);
     if (saveFocus) cards.querySelector('[data-connection="' + saveFocus + '"]')?.focus();
-    syncButton.hidden = !state.connections.some(source => source.connected);
+    syncControls();
   }
 
   async function check() {
@@ -123,7 +135,24 @@
     });
   });
   dialog.addEventListener("close", () => { keyForm.hidden = true; keyInput.value = ""; });
-  syncButton.addEventListener("click", () => act(async () => show(await api("/api/sync", {}))));
+  async function syncNow(feedback) {
+    if (updating) return;
+    updating = true;
+    syncControls();
+    feedback.textContent = "Syncing your training data…";
+    const before = new Map(current.connections.map(source => [source.id, source.lastSync]));
+    try {
+      const state = await api("/api/sync", {});
+      show(state);
+      const connected = state.connections.filter(source => source.connected);
+      feedback.textContent = connected.some(source => source.error) ? "Some data could not sync. Check Connect accounts for details."
+        : connected.some(source => source.lastSync && source.lastSync !== before.get(source.id)) ? "Sync complete."
+        : "A refresh is not available yet. Check your last sync time in Connect accounts.";
+    } catch (error) { feedback.textContent = error.message; }
+    finally { updating = false; syncControls(); }
+  }
+  syncButton.addEventListener("click", () => syncNow(note));
+  headerSync.addEventListener("click", () => syncNow(headerStatus));
   if (local) {
     void check();
     setInterval(check, 30000);

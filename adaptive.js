@@ -20,12 +20,14 @@
   }
 
   globalThis.PerformanceAdaptive = function ({ node, card, fmt, graphic, detailsButton, getReport, canSave }) {
-    let plans = [];
-    try {
+    function readPlans() {
       const stored = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-      if (Array.isArray(stored)) plans = stored.filter(plan => plan && sports.includes(plan.sport)
-        && environments.includes(plan.environment) && typeof plan.date === "string" && Number.isFinite(plan.savedAt));
-    } catch { /* Local storage may be unavailable. */ }
+      return Array.isArray(stored) ? stored.filter(plan => plan && sports.includes(plan.sport)
+        && environments.includes(plan.environment) && typeof plan.date === "string" && Number.isFinite(plan.savedAt)) : [];
+    }
+    let plans = [];
+    try { plans = readPlans(); }
+    catch { /* Local storage may be unavailable. */ }
 
     function save(next) {
       localStorage.setItem(storageKey, JSON.stringify(next.sort(byDate).slice(-180)));
@@ -54,9 +56,27 @@
       return item;
     }
 
-    function review(plan, data, refresh) {
+    function review(plan, data, refresh, canCancel = false) {
       const section = node("section", null, "workout-review");
-      section.append(node("h3", plan.date + " · " + plan.sport + " · " + plan.environment));
+      const header = node("div", null, "workout-review-header");
+      const date = canCancel && plan.date === data.date ? "" : plan.date + " · ";
+      header.append(node("h3", date + plan.sport + " · " + plan.environment));
+      section.append(header);
+      if (canCancel && !plan.actual) {
+        const cancel = node("button", "Cancel target", "adaptive-cancel");
+        cancel.type = "button";
+        const feedback = node("p", null, "muted");
+        feedback.setAttribute("role", "status");
+        cancel.addEventListener("click", () => {
+          try {
+            save(readPlans().filter(item => item.actual || item.date !== plan.date
+              || item.sport !== plan.sport || item.savedAt !== plan.savedAt));
+            refresh(true);
+          } catch { feedback.textContent = "This browser could not cancel your target."; }
+        });
+        header.append(cancel);
+        section.append(feedback);
+      }
       const actual = plan.actual ?? model.workoutActual(data.efforts, plan);
       const values = node("div", null, "adaptive-values");
       values.append(metric("Saved target", effortText(plan.target, plan.sport)), metric("HR ceiling", bpm(plan.ceiling)));
@@ -116,7 +136,11 @@
       const saveButton = node("button", "Save pre-workout target", "adaptive-primary");
       const feedback = node("p", null, "muted");
       const content = node("div", null, "adaptive-content");
-      const refresh = () => panel.replaceWith(daily(sport.value));
+      const refresh = (focusTarget = false) => {
+        const updated = daily(sport.value);
+        panel.replaceWith(updated);
+        if (focusTarget) (updated.querySelector('.adaptive-form input[type="text"]') ?? updated.querySelector("select")).focus();
+      };
       saveButton.type = "submit";
       feedback.setAttribute("role", "status");
       Object.assign(minutes, { type: "number", min: 13, max: 90, step: 1, required: true });
@@ -171,7 +195,7 @@
         const scheduled = calendar()[0];
         const cycling = sport.value === "Cycling";
         const defaults = model.workoutDefaults(data.context, sport.value, today);
-        summary.textContent = scheduled ? "On your calendar for " + scheduled.date + " · " + scheduled.name
+        summary.textContent = scheduled ? (scheduled.date === data.date ? "On today’s calendar" : "On your calendar for " + scheduled.date) + " · " + scheduled.name
           + (scheduled.minutes ? " · " + fmt(scheduled.minutes) + " min planned" : "") : "Pick an easy target and save it before you start so you can see how the session went.";
         targetField.firstElementChild.textContent = cycling ? "Steady target (W)" : "Steady pace (min/km)";
         target.inputMode = cycling ? "decimal" : "text";
@@ -181,7 +205,7 @@
         ceiling.value = Number.isFinite(defaults.ceiling) ? defaults.ceiling : "";
         environment.value = data.efforts.findLast(row => row.sport === sport.value)?.environment ?? "Outdoor";
         feedback.textContent = "";
-        content.replaceChildren(saved ? review(saved, data, refresh) : form);
+        content.replaceChildren(saved ? review(saved, data, refresh, true) : form);
         if (!saved) preview();
       };
       form.append(field("Environment", environment), targetField, field("Duration (min)", minutes), field("HR ceiling (bpm)", ceiling),
@@ -243,9 +267,9 @@
         }
         section.append(graphic(actual, options));
         detailsButton(section, label, actual, { ...options, tableRows: rows,
-          columns: ["Date", "Target", "Expected HR", "Observed HR", "Time over ceiling", "RPE", "Source"],
+          columns: ["Date", "Target", "Expected HR", "Observed HR", "Time over ceiling", "RPE"],
           row: row => [row.date, effortText(row.target, row.sport), row.forecast ? bpm(row.forecast.bpm) : "—", bpm(row.actual.bpm),
-            row.actual.measuredSeconds > 0 ? time(row.actual.secondsOver) + " / " + time(row.actual.measuredSeconds) : "—", row.rpe ?? "—", row.actual.source ?? "—"],
+            row.actual.measuredSeconds > 0 ? time(row.actual.secondsOver) + " / " + time(row.actual.measuredSeconds) : "—", row.rpe ?? "—"],
         });
         panel.append(section);
       }

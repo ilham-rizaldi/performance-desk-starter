@@ -3,6 +3,8 @@
 
   const providers = ["Garmin Connect", "Intervals.icu"];
   const sports = ["Cycling", "Running", "Strength"];
+  const optimalLoadRatio = Object.freeze({ low: 0.8, high: 1.5 });
+  const highRiskFormBelow = -30;
   const metricRanges = {
     readiness: [0, 100], bodyBattery: [0, 100], sleepScore: [0, 100], sleepMinutes: [0, 1440],
     restingHR: [1, 300], hrv: [1, 500], recoveryHours: [0, 240],
@@ -124,11 +126,17 @@
         liftedKg: number(row.liftedKg, 0, 100000),
         exerciseSets: row.sport === "Strength" ? normalizeExerciseSets(row.exerciseSets) : null,
       };
+      const reading = { source: session.source, id: session.id, minutes: session.minutes, km: session.km,
+        avgWatts: session.avgWatts, avgHR: session.avgHR,
+        timeBasis: ["duration", "moving"].includes(row.timeBasis) ? row.timeBasis : null };
       if (!previous) {
-        sessions.set(key, { ...session, sources: [row.source] });
+        sessions.set(key, { ...session, sources: [row.source], sourceReadings: [reading] });
         continue;
       }
-      if (!previous.sources.includes(row.source)) previous.sources.push(row.source);
+      if (!previous.sources.includes(row.source)) {
+        previous.sources.push(row.source);
+        previous.sourceReadings.push(reading);
+      }
       for (const name of ["name", "environment", "minutes", "km", "avgWatts", "avgHR", "liftedKg", "exerciseSets"]) previous[name] ??= session[name];
     }
     const effortKeys = new Set();
@@ -335,15 +343,51 @@
       minutes: row.minutes, offsetSeconds: row.offsetSeconds, measuredSeconds: seconds, secondsOver: over };
   }
 
-  function workoutAdjustment(data, today, minutes) {
+  function recoveryAssessment(data, date) {
     const garmin = data.wellness.filter(row => row.source === providers[0]);
-    const reading = garmin.findLast(row => row.date === today);
-    if (!reading || data.date !== today) return { title: "Check recovery first", note: "Sync today’s recovery readings before choosing your effort.", minutes: null };
+    const reading = garmin.findLast(row => row.date === date);
+    if (!reading) return { level: "partial", reasons: [] };
     const { readiness, recoveryHours, restingHR, sleepMinutes } = reading;
-    const captured = recoveryReadingTime(data, today);
-    const baseline = garmin.filter(row => row.date < today && row.restingHR != null).slice(-21);
+    const baseline = garmin.filter(row => row.date < date && row.restingHR != null).slice(-21);
     const restingDelta = baseline.length >= 7 && restingHR != null ? restingHR - median(baseline.map(row => row.restingHR)) : null;
     const sleepGap = sleepMinutes != null && reading.sleepDetails?.need != null ? reading.sleepDetails.need - sleepMinutes : null;
+    const factors = [
+      ["readiness", readiness == null || readiness >= 50 ? null : readiness < 25 ? "rest" : "easy"],
+      ["timer", recoveryHours >= 24 ? "rest" : recoveryHours > 12 ? "easy" : null],
+      ["restingHR", restingDelta >= 5 ? "easy" : null],
+      ["sleep", sleepGap >= 60 ? "easy" : null],
+    ];
+    const level = factors.some(([, flag]) => flag === "rest") ? "rest" : factors.some(([, flag]) => flag === "easy") ? "easy"
+      : (readiness == null || recoveryHours == null) && (sleepMinutes == null || restingDelta == null) ? "partial" : "start";
+    return { reading, restingDelta, sleepGap, level, reasons: factors.filter(([, flag]) => flag === level).map(([factor]) => factor) };
+  }
+
+  function trainingAssessment(data, date) {
+    const recovery = recoveryAssessment(data, date);
+    const fitness = data.wellness.findLast(row => row.date === date && row.source === providers[1]);
+    const { acuteLoad, optimalLow, optimalHigh, loadRatio, loadStatus, hrvStatus } = recovery.reading ?? {};
+    const personalRange = optimalLow != null && optimalHigh != null && optimalLow <= optimalHigh ? [optimalLow, optimalHigh] : null;
+    const withinAcute = personalRange && acuteLoad != null && acuteLoad >= personalRange[0] && acuteLoad <= personalRange[1];
+    const withinRatio = loadRatio != null && loadRatio >= optimalLoadRatio.low && loadRatio <= optimalLoadRatio.high;
+    const highLoad = personalRange && acuteLoad != null && acuteLoad > personalRange[1] ? "Acute Load was above your personal range."
+      : loadRatio > optimalLoadRatio.high ? "Load ratio was above its target range."
+        : /high|above/i.test(loadStatus ?? "") ? "Recent load was rated high." : null;
+    const cautions = [highLoad,
+      fitness?.form < highRiskFormBelow ? "Form was " + fitness.form.toFixed(1) + ", below the usual training range." : null,
+      /^(?:low|poor|unbalanced)$/i.test(hrvStatus?.trim() ?? "") ? "Your HRV status was " + hrvStatus.trim().toLowerCase() + "." : null,
+    ].filter(Boolean);
+    const level = recovery.level === "start" && cautions.length ? "easy" : recovery.level;
+    const loadContext = withinAcute ? "Acute Load was within your personal range."
+      : withinRatio ? "Load ratio was within its target range." : /^optimal$/i.test(loadStatus?.trim() ?? "") ? "Recent load was rated optimal." : null;
+    return { ...recovery, fitness, personalRange, level, cautions, loadContext };
+  }
+
+  function workoutAdjustment(data, today, minutes) {
+    if (data.date !== today) return { title: "Check recovery first", note: "Sync today’s recovery readings before choosing your effort.", minutes: null };
+    const { reading, restingDelta, level, cautions } = trainingAssessment(data, today);
+    if (!reading) return { title: "Check recovery first", note: "Sync today’s recovery readings before choosing your effort.", minutes: null };
+    const { readiness, recoveryHours, sleepMinutes } = reading;
+    const captured = recoveryReadingTime(data, today);
     const notes = [
       readiness != null ? "readiness of " + readiness + "/100" : null,
       recoveryHours != null ? Math.round(recoveryHours * 10) / 10 + " h remaining on your recovery timer"
@@ -352,12 +396,13 @@
       restingDelta != null ? "resting HR " + (restingDelta === 0 ? "at your recent median"
         : Math.round(Math.abs(restingDelta) * 10) / 10 + " bpm " + (restingDelta > 0 ? "above" : "below") + " your recent median") : null,
     ].filter(Boolean);
-    const note = "Today’s readings show " + new Intl.ListFormat("en", { type: "conjunction" }).format(notes) + ".";
-    if ((readiness != null && readiness < 25) || recoveryHours >= 24) return { title: "Give yourself more time to recover", note, minutes: null };
-    if ((readiness != null && readiness < 50) || recoveryHours > 12 || restingDelta >= 5 || sleepGap >= 60) {
+    const note = [notes.length ? "Today’s readings show " + new Intl.ListFormat("en", { type: "conjunction" }).format(notes) + "." : null,
+      ...cautions].filter(Boolean).join(" ");
+    if (level === "rest") return { title: "Give yourself more time to recover", note, minutes: null };
+    if (level === "easy") {
       return { title: "Keep it short and easy", note, minutes: Math.min(minutes, 25) };
     }
-    if ((readiness == null || recoveryHours == null) && (sleepMinutes == null || restingDelta == null)) {
+    if (level === "partial") {
       return { title: "Check recovery first", note: "There’s only a partial view of your recovery today. Sync any newer readings before you set a target.", minutes: null };
     }
     return { title: "Start easy", note, minutes };
@@ -371,5 +416,5 @@
 
   globalThis.PerformanceData = { providers, sports, normalize, number, currentDate, matchingEfforts, hasComparableEfforts, hrEstimate,
     ceilingReference, strengthRecords, workoutForecast, workoutDefaults, recoveryReadingTime,
-    gentlerWorkoutTarget, workoutActual, workoutAdjustment, weeklyEffort };
+    gentlerWorkoutTarget, workoutActual, workoutAdjustment, recoveryAssessment, trainingAssessment, optimalLoadRatio, highRiskFormBelow, weeklyEffort };
 })();

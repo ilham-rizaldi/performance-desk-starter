@@ -100,6 +100,7 @@ function activity(row, source) {
     environment: environmentType(type) ?? (isGarmin ? null : row.trainer === true ? "Indoor"
       : row.stream_types?.includes("latlng") ? "Outdoor" : null),
     minutes: scale(isGarmin ? row.duration : row.moving_time, 1 / 60),
+    timeBasis: isGarmin ? "duration" : "moving",
     km: scale(row.distance, 1 / 1000),
     avgHR: number(isGarmin ? row.averageHR : row.average_heartrate),
     avgWatts: isGarmin ? number(row.avgPower) : row.device_watts === true ? number(row.average_watts) : null,

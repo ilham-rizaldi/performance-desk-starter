@@ -4,6 +4,8 @@ Use the local app to connect **Garmin Connect Personal API**, **Intervals.icu**,
 
 ## 1. Start the local app
 
+If you use Codex desktop, paste the [install prompt](SETUP-PROMPT.md) to have it prepare and open the app. For manual setup, use the steps below.
+
 1. Choose **Code → Download ZIP** from the [starter repository](https://github.com/ilham-rizaldi/performance-desk-starter) and extract the folder.
 2. Install [Node.js LTS](https://nodejs.org/) if needed. Open Terminal in the extracted folder. Run `npm ci`, then `npm start`.
 3. Open [Performance Desk on this computer](http://127.0.0.1:4176/) and select **Connect accounts**. Leave the app running while you want updates.
@@ -28,8 +30,8 @@ If you already run an approved OAuth app, set `INTERVALS_CLIENT_ID` and, if requ
 
 ## 4. Check what arrived
 
-- Garmin is checked every **60 minutes** and Intervals.icu every **15 minutes** while the app is running. **Sync now** asks for an earlier check, subject to provider limits.
-- Automatic sync covers up to **42 days**. Recent FIT recordings and activity streams are checked in batches. A cycling estimate needs paired HR and measured power. A running estimate needs paired HR and pace, in the same indoor or outdoor context.
+- Garmin is checked every **60 minutes** and Intervals.icu every **15 minutes** while the app is running. Select **Sync now** at the top of the dashboard to request an earlier check, subject to provider limits.
+- Automatic sync covers up to **42 days**. The app checks recent FIT recordings and activity streams in batches. A cycling estimate needs paired HR and measured power. A running estimate needs paired HR and pace, in the same indoor or outdoor context. Session cross-check needs a matching activity record from each source.
 - The cards use the readings your connection actually supplies. Readiness, recovery timer, training status, load ranges, and older detailed readings can come from a private archive. The timer shows the remaining time at the recorded check. It includes the time of the check when the archive provides it.
 - If an update fails, the app shows the connection status and keeps the last successful reading for that running session.
 
@@ -41,7 +43,7 @@ If you already run an approved OAuth app, set `INTERVALS_CLIENT_ID` and, if requ
 | Access expired or denied | Use **Reconnect**. Check whether your key has expired. |
 | **Last synced** is old | Check that the app is running and online, then try **Sync now**. |
 | An HR estimate is missing | Choose the right sport and environment. A target needs comparable steady efforts from at least two earlier days. Older recordings may still be processing. |
-| The GitHub preview shows empty cards | Start the local app to connect accounts, or use **Open report file** to inspect a saved report. |
+| The GitHub preview shows empty cards | Start the local app and connect an account to see your private dashboard. |
 
 ## Use an existing private archive
 

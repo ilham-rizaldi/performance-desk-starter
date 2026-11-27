@@ -21,11 +21,13 @@
       <button type="button" data-view="archive">Archive</button>
       <button type="button" data-view="reference" hidden>Reference</button>
     </nav>
-    <button type="button" id="show-connections">Connect accounts</button>
-    <label class="import">Open report file <input type="file" id="report-input" accept=".json,application/json"></label>
+    <div class="header-actions">
+      <button type="button" id="show-connections" aria-label="Connect accounts"><span class="connections-label-full">Connect accounts</span><span class="connections-label-short">Accounts</span></button>
+      <button type="button" id="header-sync" hidden>Sync now</button>
+    </div>
   </div></header>
   <main class="frame">
-    <div id="feedback" role="status" aria-live="polite"></div>
+    <p id="header-sync-status" role="status" aria-live="polite"></p>
     <section id="daily" aria-labelledby="daily-title">
       <div class="page-heading"><h1 id="daily-title">Daily</h1><time id="report-date"></time></div>
       <div id="daily-content"></div>
@@ -57,6 +59,6 @@
     </form>
     <button id="sync-now" type="button" hidden>Sync now</button>
   </dialog>
-  <noscript>Turn on JavaScript to open a report file in this browser.</noscript>
+  <noscript>Turn on JavaScript to use the dashboard.</noscript>
 </body>
 </html>

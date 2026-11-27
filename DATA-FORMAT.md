@@ -1,6 +1,6 @@
 # Report file format
 
-Use [report.blank.json](report.blank.json) as a starting point. Open a report with **Open report file**. Use numeric values without unit strings. Leave unknown fields out or set them to `null`.
+Use [report.blank.json](report.blank.json) as a reference for the report structure. For an existing private archive, follow the [local archive instructions](SYNC.md#use-an-existing-private-archive). Use numeric values without unit strings. Leave unknown fields out or set them to `null`.
 
 | Field | Value |
 |---|---|
@@ -19,7 +19,7 @@ For `sleepDetails`, use local `HH:mm` for `bed` and `wake`, Unix milliseconds fo
 
 ## Activities
 
-Each activity requires `id` as text, `date`, `source`, and `sport`. Use `sessionKey` when two records have been verified as copies of the same session. Optional fields include `environment`, `minutes`, `km`, `avgWatts`, `avgHR` (bpm), and `liftedKg` (recorded total set volume).
+Each activity requires `id` as text, `date`, `source`, and `sport`. Use `sessionKey` when two records have been verified as copies of the same session. Optional fields include `environment`, `minutes`, `km`, `avgWatts`, `avgHR` (bpm), and `liftedKg` (recorded total set volume). Use `timeBasis` of `moving` for moving time or `duration` for recorded duration when known. The dashboard calculates a time difference only when the two records use the same time basis.
 
 A strength `exerciseSets` item can contain `exercise`, `weightKg`, and `reps`. Keep an unnamed weighted set if the weight and reps are known. The volume total can include that set, and per-exercise records use named sets only.
 

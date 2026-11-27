@@ -4,7 +4,6 @@
   const element = id => document.getElementById(id);
   const metricColors = { cyan: "#56e8f4", pink: "#ff77a8", green: "#7aefa8", violet: "#be9cff", amber: "#ffc572" };
   let report = null;
-  let mode = null;
 
   function node(tag, text, className) {
     const item = document.createElement(tag);
@@ -65,7 +64,7 @@
     color = "cyan", format = fmt, label = "History", seriesName, overlay = [], overlayColor = "amber", overlayName,
     overlayFormat = format, overlayAxis,
     band = [], bandName, axes = false, size = "standard", zeroFloor = false, gapDays = 7, dateDomain = [],
-    plotBackground, area = false, zones = [], axisTicks, tooltipRows, markReadings = axes,
+    plotBackground, area = false, zones = [], axisTicks, tooltipRows, tooltipReadings, markReadings = axes, linkedDate,
   } = {}) {
     const timed = list => list.map(row => ({ ...row, time: Date.parse(row.date) })).sort((a, b) => a.time - b.time);
     const series = [
@@ -82,7 +81,7 @@
       for (const row of line.items) if (!data.has(row.time)) data.set(row.time, row);
     }
     const rangeByTime = new Map(ranges.map(row => [row.time, row]));
-    const timestamps = [...data.keys()].sort((a, b) => a - b);
+    const timestamps = linkedDate?.dates ?? [...data.keys()].sort((a, b) => a - b);
     const xMin = Math.min(timestamps[0], ranges[0]?.time ?? Infinity, ...dateDomain);
     const xMax = Math.max(timestamps.at(-1), ranges.at(-1)?.time ?? -Infinity, ...dateDomain);
     const bounds = zones.flatMap(zone => [zone.low, zone.high]).filter(Number.isFinite);
@@ -103,6 +102,21 @@
     canvas.setAttribute("aria-label", label + ". Use left and right arrows to read values.");
     const context = canvas.getContext("2d");
     let selected = timestamps.length - 1, active = false, geometry;
+    if (linkedDate) {
+      selected = Math.max(0, timestamps.indexOf(linkedDate.current));
+      linkedDate.bind((time, showTooltip = true) => {
+        if (time == null) { clearHover(); return; }
+        const index = timestamps.indexOf(time);
+        if (index < 0) return;
+        if (linkedDate.mirrorHover && (showTooltip || !linkedDate.retainCursor)) {
+          reveal(index, { announce: false, showTooltip });
+          return;
+        }
+        if (index === selected && !active) return;
+        selected = index;
+        clearHover();
+      });
+    }
 
     function draw() {
       const bounds = canvas.getBoundingClientRect();
@@ -119,8 +133,8 @@
       context.font = "11px DM Sans, Arial, sans-serif";
       const axisValue = value => fmt(value, 2);
       const tickWidth = labels => Math.ceil(Math.max(...labels.map(value => context.measureText(axisValue(value)).width)));
-      const left = axes ? Math.max(37, tickWidth(ticks) + 12) : 5;
-      const right = width - (axes ? (secondaryScale ? Math.max(30, tickWidth(secondaryScale.ticks) + 12) : 14) : 5);
+      const left = linkedDate ? 46 : axes ? Math.max(37, tickWidth(ticks) + 12) : 5;
+      const right = width - (linkedDate ? 43 : axes ? (secondaryScale ? Math.max(30, tickWidth(secondaryScale.ticks) + 12) : 14) : 5);
       const top = axes ? (secondaryScale ? 24 : 12) : 4, bottom = height - (axes ? 27 : 4);
       const x = time => xMin === xMax ? (left + right) / 2 : left + (right - left) * (time - xMin) / (xMax - xMin);
       const y = value => bottom - (bottom - top) * (value - min) / (max - min);
@@ -227,7 +241,7 @@
         }
       }
 
-      if (!active) return;
+      if (!active && (!linkedDate || (linkedDate.mirrorHover && !linkedDate.retainCursor))) return;
       const time = timestamps[selected], cursor = x(time);
       context.strokeStyle = "#a7b4c278";
       context.lineWidth = 1;
@@ -247,19 +261,26 @@
       }
     }
 
-    function reveal(index) {
-      const changed = selected !== index || !active;
+    function reveal(index, { announce = true, showTooltip = true } = {}) {
+      const changed = selected !== index || !active || showTooltip !== tooltip.classList.contains("is-visible");
       selected = index;
       active = true;
+      if (changed && announce) linkedDate?.onChange(timestamps[index]);
+      if (!showTooltip) {
+        hideTooltip();
+        if (changed) draw();
+        return;
+      }
       if (changed) {
         const time = timestamps[selected];
-        const items = series.flatMap(line => {
+        const items = tooltipReadings?.(time) ?? series.flatMap(line => {
           const row = line.byTime.get(time);
           return row ? [[line.name, line.format(row.value), line.color]] : [];
         });
         if (tooltipRows) items.push(...tooltipRows(time));
         const range = rangeByTime.get(time);
         if (range && bandName) items.push([bandName, format(range.low) + "–" + format(range.high), "green"]);
+        if (!items.length && linkedDate) items.push(["Reading", "—", "#b0b5c0"]);
         tooltip.replaceChildren(...items.map(([name, value, key]) => {
           const line = node("div", null, "chart-tooltip-row");
           if (name) line.append(node("span", name));
@@ -288,25 +309,36 @@
         Math.abs(geometry.x(time) - cursor) < Math.abs(geometry.x(timestamps[best]) - cursor) ? i : best, 0);
       reveal(nearest);
     }
-    function hide() {
-      active = false;
+    function hideTooltip() {
       tooltip.classList.remove("is-visible");
+      tooltip.style.removeProperty("left");
+    }
+    function clearHover() {
+      active = false;
+      hideTooltip();
       draw();
+    }
+    function hide() {
+      if (!active) return;
+      clearHover();
+      linkedDate?.onLeave?.();
     }
     canvas.addEventListener("pointermove", chooseByPointer);
     canvas.addEventListener("pointerdown", chooseByPointer);
-    canvas.addEventListener("pointerleave", hide);
+    canvas.addEventListener("pointerleave", event => {
+      if (!linkedDate?.mirrorHover || event.pointerType !== "touch") hide();
+    });
     canvas.addEventListener("blur", hide);
     canvas.addEventListener("keydown", event => {
       if (event.key === "Escape" && active) { event.stopPropagation(); hide(); return; }
       if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
       event.preventDefault();
-      const index = active ? selected + (event.key === "ArrowLeft" ? -1 : 1) : timestamps.length - 1;
+      const index = active || linkedDate ? selected + (event.key === "ArrowLeft" ? -1 : 1) : timestamps.length - 1;
       reveal(Math.max(0, Math.min(timestamps.length - 1, index)));
     });
     chartRedraw.set(canvas, () => {
       draw();
-      if (active) positionTooltip();
+      if (tooltip.classList.contains("is-visible")) positionTooltip();
     });
     output.append(canvas, tooltip);
     chartSize.observe(canvas);
@@ -316,14 +348,14 @@
   function historyTable(tableRows, options) {
     const wrapper = node("div", null, "table-wrap");
     const table = node("table");
-    const columns = options.columns || ["Date", options.unit || "Value", "Source"];
+    const columns = options.columns || ["Date", options.unit || "Value"];
     const head = node("thead"), headings = node("tr");
     for (const title of columns) headings.append(node("th", title));
     head.append(headings);
     const body = node("tbody");
     for (const row of [...tableRows].reverse()) {
       const tr = node("tr");
-      const values = options.row ? options.row(row) : [row.date, (options.format || fmt)(row.value), row.source];
+      const values = options.row ? options.row(row) : [row.date, (options.format || fmt)(row.value)];
       for (const value of values) tr.append(node("td", value));
       body.append(tr);
     }
@@ -362,11 +394,13 @@
   }
 
   function detailsButton(panel, title, rows, options) {
+    const actions = node("div", null, "card-details");
     const details = node("button", "+ Details", "history-button");
     details.type = "button";
     details.setAttribute("aria-label", "Details for " + title);
     details.addEventListener("click", () => showHistory(title, rows, options));
-    panel.append(details);
+    actions.append(details);
+    panel.append(actions);
   }
 
   function valuesFor(field, source) {
@@ -381,13 +415,12 @@
     const panel = card(label);
     const rows = valuesFor(field, source);
     const latest = rows.at(-1);
-    const compactReadiness = field === "readiness" && !chart;
     const sleepTime = field === "sleepMinutes" && latest;
     const readout = node("p", sleepTime ? Math.floor(latest.value / 60) + "h " + Math.round(latest.value % 60) + "m" : fmt(latest?.value), "metric");
     readout.style.setProperty("--accent", metricColors[color]);
     if (latest && unit && !sleepTime) readout.append(node("small", unit));
     panel.append(readout);
-    if (!compactReadiness || !latest || latest.date !== report?.date) {
+    if (!latest || latest.date !== report?.date) {
       panel.append(node("small", latest ? latest.date : "No recorded reading"));
     }
     const options = { color, label, format: value => fmt(value) + (unit && unit !== "/100" ? " " + unit : unit), unit: label + (unit ? " (" + unit + ")" : "") };
@@ -398,14 +431,7 @@
       fill.style.width = latest.value + "%";
       if (latest.value > 0) fill.style.setProperty("--scale", (10000 / latest.value) + "%");
       track.append(fill);
-      if (compactReadiness) {
-        const gauge = node("div", null, "readiness-visual");
-        const ticks = node("div", null, "readiness-ticks");
-        ticks.setAttribute("aria-hidden", "true");
-        ticks.append(...[0, 50, 100].map(value => node("span", value)));
-        gauge.append(track, ticks);
-        panel.append(gauge);
-      } else panel.append(track);
+      panel.append(track);
     }
     if (chart && rows.length) {
       const preview = typeof chart === "object" ? chart : {};
@@ -455,8 +481,8 @@
         axes: true, zeroFloor: true, size: "strength", area: true, plotBackground: "#14121c" };
       strength.append(node("h3", "Daily lifting volume", "strength-chart-heading"), graphic(volume, options));
       detailsButton(strength, "Strength sessions", volume, {
-        ...options, tableRows: sessions, columns: ["Date", "Session", "Recorded volume", "Source"],
-        row: row => [row.date, row.name || "Strength", row.liftedKg == null ? "—" : kg(row.liftedKg), row.sources.join(", ")],
+        ...options, tableRows: sessions, columns: ["Date", "Session", "Recorded volume"],
+        row: row => [row.date, row.name || "Strength", row.liftedKg == null ? "—" : kg(row.liftedKg)],
       });
     }
 
@@ -492,7 +518,7 @@
   const panels = globalThis.PerformancePanels({ node, card, fmt, graphic, metric, valuesFor, showHistory, detailsButton,
     getReport: () => report, currentDate: model.currentDate, colors: metricColors });
   const adaptive = globalThis.PerformanceAdaptive({ node, card, fmt, graphic, detailsButton,
-    getReport: () => report, canSave: () => mode === "live" });
+    getReport: () => report, canSave: () => Boolean(report) });
 
   const viewButtons = [...document.querySelectorAll("[data-view]")];
   const referenceButton = viewButtons.find(button => button.dataset.view === "reference");
@@ -525,31 +551,8 @@
   }
 
   window.addEventListener("performance-desk-live", event => {
-    if (event.detail) {
-      report = model.normalize(event.detail);
-      mode = "live";
-      element("feedback").textContent = "";
-    } else if (mode === "live") {
-      report = null;
-      mode = null;
-      element("feedback").textContent = "";
-    }
+    report = event.detail ? model.normalize(event.detail) : null;
     render();
-  });
-  element("report-input").addEventListener("change", async event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      if (file.size > 10_000_000) throw Error("The report file is too large. Ask GPT for a smaller report.");
-      report = model.normalize(JSON.parse(await file.text()));
-      mode = "file";
-      render();
-      element("feedback").textContent = "";
-    } catch (error) {
-      element("feedback").textContent = error instanceof SyntaxError ? "This file is not valid JSON." : error.message;
-    } finally {
-      event.target.value = "";
-    }
   });
   render();
 })();
