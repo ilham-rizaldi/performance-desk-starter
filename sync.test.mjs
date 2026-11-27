@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createSyncServer } from "./sync.mjs";
 import { buildReport, dateRange, syncGarmin, syncIntervals } from "./providers.mjs";
+import "./data.js";
 
 const { reportDate: date } = dateRange();
 const garminActivity = { activityId: 41, activityType: { typeKey: "road_biking" },
@@ -54,6 +55,18 @@ test("builds a dated report with matched sessions, restricted activity sources a
   assert.equal(report.activities.length, 2);
   assert.equal(report.activities[0].sessionKey, report.activities[1].sessionKey);
   assert.deepEqual(report.efforts, []);
+});
+
+test("manual reports accept only the same two providers as automatic sync", () => {
+  const { normalize, providers } = globalThis.PerformanceData;
+  const rows = ["Garmin Connect", "Intervals.icu", "Strava"].map(source => ({
+    date, source, sport: "Cycling", id: source, minutes: 30,
+  }));
+  const report = normalize({
+    version: 1, reportDate: date, timezone: "UTC", activities: rows, wellness: [], efforts: [],
+  });
+  assert.deepEqual(providers, ["Garmin Connect", "Intervals.icu"]);
+  assert.deepEqual(report.activities.map(row => row.source), providers);
 });
 
 test("authorizes both routes, rejects unsafe origins and removes the disconnected data", async t => {

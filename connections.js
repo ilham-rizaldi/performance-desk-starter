@@ -91,11 +91,7 @@
       if (source.connected) card.append(button("Disconnect", () => act(async () => show(await api("/api/" + source.id + "/disconnect", {})))));
       elements.push(card);
     }
-    const strava = node("article", "");
-    strava.className = "card";
-    strava.append(node("h3", "Strava"), node("p", "For personal AI use, check availability of the official Strava MCP. This dashboard syncs Garmin and Intervals.icu."),
-      link("Strava’s integration policy", "https://www.strava.com/legal/api_policy"));
-    cards.replaceChildren(...elements, strava);
+    cards.replaceChildren(...elements);
     if (saveFocus) cards.querySelector('[data-connection="' + saveFocus + '"]')?.focus();
     syncButton.hidden = !state.connections.some(source => source.connected);
   }

@@ -1,6 +1,6 @@
 # Struktur file laporan
 
-File adalah JSON dengan empat bagian wajib. Salin [kerangka kosong](report.blank.json), isi `reportDate` dan `timezone`, lalu masukkan data yang benar-benar tersedia ke tiga daftar. Angka berupa nilai JSON, tanpa unit di dalam nilainya. Nilai yang tidak diketahui boleh dihilangkan atau diisi `null`. Semua tanggal memakai `YYYY-MM-DD` menurut zona waktu pemilik.
+File adalah JSON dengan struktur berikut. Salin [kerangka kosong](report.blank.json), isi `reportDate` dan `timezone`, lalu masukkan data yang benar-benar tersedia ke tiga daftar. Angka berupa nilai JSON, tanpa unit di dalam nilainya. Nilai yang tidak diketahui boleh dihilangkan atau diisi `null`. Semua tanggal memakai `YYYY-MM-DD` menurut zona waktu pemilik.
 
 | Field | Isi |
 |---|---|
@@ -9,7 +9,7 @@ File adalah JSON dengan empat bagian wajib. Salin [kerangka kosong](report.blank
 | `timezone` | Nama zona waktu IANA, misalnya `Asia/Jakarta`. |
 | `wellness`, `activities`, `efforts` | Daftar di bawah. Gunakan `[]` jika data belum tersedia. |
 
-`source` harus salah satu dari `Garmin Connect`, `Intervals.icu`, atau `Strava`. `sport` menggunakan `Cycling`, `Running`, atau `Strength`. `environment` adalah `Indoor` atau `Outdoor` dan boleh kosong pada ringkasan aktivitas bila klasifikasinya tidak pasti.
+`source` harus salah satu dari `Garmin Connect` atau `Intervals.icu`. Baris dari sumber lain dilewati. `sport` menggunakan `Cycling`, `Running`, atau `Strength`. `environment` adalah `Indoor` atau `Outdoor` dan boleh kosong pada ringkasan aktivitas bila klasifikasinya tidak pasti.
 
 ## Wellness
 
@@ -19,7 +19,7 @@ Setiap baris wajib memiliki `date` dan `source`. Isi satu baris untuk tiap tangg
 
 Wajib `date`, `source`, `sport`, dan `id` berupa teks. `sessionKey` opsional, sama untuk salinan lintas sumber yang sudah diverifikasi untuk olahraga dan tanggal yang sama. ID lokal yang kebetulan sama di dua penyedia tetap terpisah. Field opsional lainnya adalah `environment`, `minutes` (timer dalam menit), `km`, `avgWatts`, `avgHR` (bpm), dan `liftedKg` (total set yang tercatat).
 
-Untuk sesi yang terverifikasi sama, pembacaan Garmin diutamakan, lalu Intervals.icu, lalu Strava. Field yang kosong dapat diisi dari salinan yang cocok. Catat konflik penting di luar file laporan dan jangan salah menggolongkan ringkasan sebagai pengukuran blok.
+Untuk sesi yang terverifikasi sama, pembacaan Garmin diutamakan, lalu Intervals.icu. Field yang kosong dapat diisi dari salinan yang cocok. Catat konflik penting di luar file laporan dan jangan salah menggolongkan ringkasan sebagai pengukuran blok.
 
 ## Efforts
 

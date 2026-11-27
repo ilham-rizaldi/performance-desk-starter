@@ -1,8 +1,8 @@
 # Performance Desk Starter
 
-Dashboard latihan pribadi untuk cycling, running, dan strength. Template ini mulai kosong. Gunakan data dari akun Anda sendiri.
+Dashboard latihan pribadi untuk cycling, running, dan strength. Hubungkan **Garmin Connect Personal API** dan **Intervals.icu** untuk mengisi dashboard kosong dengan data Anda sendiri.
 
-**Mau pembaruan otomatis tanpa memilih file laporan?** Mulai dari [panduan Connect dan sinkron otomatis](SYNC.md). Mode ini berjalan di aplikasi privat di komputer Anda. Langkah berikut untuk preview dan mode file.
+**Mulai dari [panduan Connect dan sinkron otomatis](SYNC.md).** Selesaikan setup satu kali di komputer Anda, lalu data akan muncul langsung di dashboard. Langkah di bawah ini bisa dipakai untuk mencoba preview dan membuka file laporan yang sudah ada.
 
 ## Mulai dalam 3 langkah
 
@@ -24,7 +24,6 @@ Ikuti langkah yang muncul satu per satu. Masukkan password dan kode verifikasi h
 |---|---|---|
 | **Garmin Connect** | Recovery, wellness, aktivitas, dan rekaman asli dari perangkat | Masuk ke [Garmin Connect](https://connect.garmin.com/). Untuk ekspor sesi, buka **Activities → All Activities** dan pilih **Export CSV**, atau buka satu aktivitas dan pilih ekspor versi asli. Ekspor ini punya cakupan berbeda. [Panduan ekspor Garmin](https://support.garmin.com/en-US/?faq=W1TvTPW8JZ6LfJSfK512Q8) |
 | **Intervals.icu** | Fitness, Fatigue, Form, riwayat aktivitas, dan wellness yang tersedia | Masuk ke [Intervals.icu](https://intervals.icu/). Buka **Fitness** untuk membaca grafik harian, dan kalender atau detail aktivitas untuk riwayat. Kirim ekspor yang tersedia ke chat pengaturan pribadi Anda. [Dokumentasi integrasi Intervals.icu](https://www.intervals.icu/features/open-api/) |
-| **Strava** | Riwayat aktivitas, waktu, jarak, dan rekaman asli bila tersedia | Masuk ke [Strava](https://www.strava.com/). Di web, **Settings → My Account → Download your account** untuk meminta arsip. Untuk satu sesi, buka aktivitas dan pilih **Export Original** jika tersedia. [Panduan ekspor Strava](https://support.strava.com/en-us/articles/15401919-how-do-i-export-my-strava-data) |
 
 ### 3. Buka laporan
 

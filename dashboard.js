@@ -168,7 +168,7 @@
       const blank = card("No report open", "empty");
       blank.append(node("p", "Open a private report file to see recovery, training load and recent workouts.", "muted"));
       const links = node("div", null, "source-links");
-      for (const [title, url] of [["Garmin Connect", "https://connect.garmin.com/"], ["Intervals.icu", "https://intervals.icu/"], ["Strava", "https://www.strava.com/"]]) {
+      for (const [title, url] of [["Garmin Connect", "https://connect.garmin.com/"], ["Intervals.icu", "https://intervals.icu/"]]) {
         const link = node("a", title);
         link.href = url;
         link.target = "_blank";

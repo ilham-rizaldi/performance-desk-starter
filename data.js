@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const providers = ["Garmin Connect", "Intervals.icu", "Strava"];
+  const providers = ["Garmin Connect", "Intervals.icu"];
   const sports = ["Cycling", "Running", "Strength"];
   const metricRanges = {
     readiness: [0, 100], bodyBattery: [0, 100], sleepScore: [0, 100], sleepMinutes: [0, 1440],
