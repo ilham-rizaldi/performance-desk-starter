@@ -48,6 +48,7 @@ async function open(value, key, name) {
 }
 
 const savedRows = db => db.prepare("SELECT id, attempted_at, synced_at, problem, payload FROM starter_cache").all();
+const upstream = (...args) => globalThis.fetch(...args);
 
 async function setup(db) {
   await db.prepare("CREATE TABLE IF NOT EXISTS starter_cache (id TEXT PRIMARY KEY, attempted_at INTEGER NOT NULL, synced_at INTEGER, problem TEXT, payload TEXT)").run();
@@ -63,7 +64,11 @@ async function refresh(id, row, env, key, manual, now, fetchProvider) {
   if (!claimed) return;
   try {
     const value = id === "garmin" ? env.STARTER_GARMIN_KEY : env.STARTER_INTERVALS_KEY;
-    if (!value) throw new Error("Provider credential missing");
+    if (!value) {
+      await db.prepare("UPDATE starter_cache SET problem=? WHERE id=? AND attempted_at=?")
+        .bind("The private provider connection needs setup.", id, now).run();
+      return;
+    }
     const result = await providers[id]({ kind: "key", value }, new Date(now), fetchProvider, undefined, { timeZone, includeEfforts: false });
     const { wellness, activities, calendar, notices } = result;
     const payload = await seal({ wellness, activities, calendar, notices }, key, id);
@@ -71,13 +76,19 @@ async function refresh(id, row, env, key, manual, now, fetchProvider) {
       .bind(now, payload, id, now).run();
   } catch (error) {
     const problem = [401, 403].includes(error.status) ? "Provider access expired or was denied."
-      : error.status === 429 ? "The provider requested a pause." : "The provider could not complete the latest sync.";
+      : error.status === 429 ? "The provider requested a pause."
+      : error.status ? `The provider returned HTTP ${error.status}.`
+      : error.name === "TimeoutError" ? "The provider connection timed out."
+      : "The hosted service could not refresh this provider.";
+    console.warn("Starter provider refresh failed", id, error.name,
+      Number.isInteger(error.status) ? error.status : "no HTTP status",
+      /illegal invocation/i.test(error.message) ? "unbound fetch" : /not allowed|forbidden/i.test(error.message) ? "network policy" : "provider refresh");
     await db.prepare("UPDATE starter_cache SET problem=? WHERE id=? AND attempted_at=?")
       .bind(problem, id, now).run();
   }
 }
 
-export async function starterRequest(request, env, { publisher = false, fetchProvider = fetch } = {}) {
+export async function starterRequest(request, env, { publisher = false, fetchProvider = upstream } = {}) {
   if (request.method === "OPTIONS" && request.headers.get("Origin") === githubOrigin) {
     return new Response(null, { status: 204, headers: { ...headers, "Access-Control-Allow-Methods": "GET, POST",
       "Access-Control-Allow-Headers": "Authorization" } });
@@ -116,6 +127,7 @@ export async function starterRequest(request, env, { publisher = false, fetchPro
       const payload = await seal(reference, key, "reference");
       await env.DB.prepare("INSERT INTO starter_cache VALUES ('reference',?,?,NULL,?) ON CONFLICT(id) DO UPDATE SET attempted_at=excluded.attempted_at, synced_at=excluded.synced_at, payload=excluded.payload")
         .bind(now, now, payload).run();
+      await env.DB.prepare("UPDATE starter_cache SET attempted_at=0 WHERE synced_at IS NULL AND id IN ('garmin','intervals')").run();
       return json({ date: reference.reportDate });
     }
     const readState = async () => new Map((await savedRows(env.DB)).results.map(row => [row.id, row]));

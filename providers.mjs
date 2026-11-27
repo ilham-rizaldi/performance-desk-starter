@@ -29,7 +29,8 @@ export class SourceError extends Error {
 }
 
 async function read(url, options, request, format = "json") {
-  const response = await request(url, { ...options, redirect: "error", signal: AbortSignal.timeout(12000) });
+  const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12000) : undefined;
+  const response = await request(url, { ...options, redirect: "error", signal });
   if (!response.ok) {
     const retry = response.headers.get("Retry-After");
     const retryAt = retry == null ? null : /^\d+$/.test(retry) ? Date.now() + Number(retry) * 1000 : Date.parse(retry);
