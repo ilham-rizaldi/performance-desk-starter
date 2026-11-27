@@ -6,7 +6,9 @@ Dashboard latihan pribadi untuk cycling, running, dan strength. Template ini mul
 
 ### 1. Unduh dan buka dashboard
 
-Klik tombol hijau **Code → Download ZIP** di halaman repo ini. Buka ZIP, lalu klik dua kali **index.html** di folder hasil ekstrak. Gunakan Chrome, Edge, atau Safari di komputer. Halaman **Daily** yang masih kosong berarti dashboard siap digunakan.
+Buka [dashboard kosong di browser](https://ilham-rizaldi.github.io/performance-desk-starter/). Halaman **Daily** yang masih kosong berarti dashboard siap digunakan.
+
+Untuk salinan offline, klik tombol hijau **Code → Download ZIP** di halaman repo ini. Buka ZIP, lalu klik dua kali **index.html** di folder hasil ekstrak. Gunakan Chrome, Edge, atau Safari di komputer.
 
 Tidak perlu memasang Node.js, menjalankan Terminal, atau membuat akun GitHub untuk membuka dashboard.
 
