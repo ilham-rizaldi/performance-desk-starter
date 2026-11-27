@@ -1,58 +1,39 @@
 # Performance Desk Starter
 
-Dashboard latihan pribadi untuk cycling, running, dan strength. Hubungkan **Garmin Connect Personal API** dan **Intervals.icu** untuk mengisi dashboard kosong dengan data Anda sendiri.
+Dashboard latihan pribadi untuk cycling, running, dan strength. Hubungkan **Garmin Connect Personal API** dan **Intervals.icu** di komputer Anda. Setelah terhubung, aktivitas dan metrik yang tersedia akan diperbarui otomatis selama aplikasi berjalan.
 
-**Mulai dari [panduan Connect dan sinkron otomatis](SYNC.md).** Selesaikan setup satu kali di komputer Anda, lalu data akan muncul langsung di dashboard. Langkah di bawah ini bisa dipakai untuk mencoba preview dan membuka file laporan yang sudah ada.
+[**Panduan Connect langkah demi langkah**](SYNC.md) · [**Lihat preview dashboard**](https://ilham-rizaldi.github.io/performance-desk-starter/)
 
 ## Mulai dalam 3 langkah
 
-### 1. Unduh dan buka dashboard
+1. **Unduh starter.** Di halaman repo ini, klik **Code → Download ZIP** dan ekstrak foldernya. Pasang [Node.js LTS](https://nodejs.org/) jika belum tersedia.
+2. **Jalankan aplikasi.** Jika memakai Codex, buka folder tadi di Codex dan kirim “Jalankan Performance Desk Starter di folder ini, lalu buka dashboard lokalnya.” Jika menjalankan sendiri, buka Terminal di folder tersebut, ketik `npm start`, lalu buka [dashboard lokal Anda](http://127.0.0.1:4176/).
+3. **Klik Connect accounts.** Pilih **Connect** di kartu Garmin atau Intervals.icu. Ambil API key dari pengaturan resmi sumber yang Anda pilih dan masukkan di dashboard lokal. Ulangi untuk sumber kedua bila perlu. Cek **Last synced** untuk memastikan data sudah masuk.
 
-Buka [dashboard kosong di browser](https://ilham-rizaldi.github.io/performance-desk-starter/). Halaman **Daily** yang masih kosong berarti dashboard siap digunakan.
-
-Untuk salinan offline, klik tombol hijau **Code → Download ZIP** di halaman repo ini. Buka ZIP, lalu klik dua kali **index.html** di folder hasil ekstrak. Gunakan Chrome, Edge, atau Safari di komputer.
-
-Tidak perlu memasang Node.js, menjalankan Terminal, atau membuat akun GitHub untuk membuka dashboard.
-
-### 2. Salin prompt ke ChatGPT
-
-Buka [SETUP-PROMPT.md](SETUP-PROMPT.md), salin isi promptnya, lalu kirim di chat pribadi Anda. Jika punya Codex atau opsi Work dengan kontrol browser, gunakan itu agar GPT bisa membantu cek halaman yang sudah Anda masuki. Di ChatGPT biasa, pilih cara ekspor file saat GPT tidak bisa membaca situs akun Anda.
-
-Ikuti langkah yang muncul satu per satu. Masukkan password dan kode verifikasi hanya di halaman login resmi masing-masing layanan. Anda bisa mulai dari satu akun dan menambahkan sumber lain nanti.
-
-| Sumber | Data yang bisa dipakai | Cara mendapatkannya |
-|---|---|---|
-| **Garmin Connect** | Recovery, wellness, aktivitas, dan rekaman asli dari perangkat | Masuk ke [Garmin Connect](https://connect.garmin.com/). Untuk ekspor sesi, buka **Activities → All Activities** dan pilih **Export CSV**, atau buka satu aktivitas dan pilih ekspor versi asli. Ekspor ini punya cakupan berbeda. [Panduan ekspor Garmin](https://support.garmin.com/en-US/?faq=W1TvTPW8JZ6LfJSfK512Q8) |
-| **Intervals.icu** | Fitness, Fatigue, Form, riwayat aktivitas, dan wellness yang tersedia | Masuk ke [Intervals.icu](https://intervals.icu/). Buka **Fitness** untuk membaca grafik harian, dan kalender atau detail aktivitas untuk riwayat. Kirim ekspor yang tersedia ke chat pengaturan pribadi Anda. [Dokumentasi integrasi Intervals.icu](https://www.intervals.icu/features/open-api/) |
-
-### 3. Buka laporan
-
-Unduh **performance-report.json** yang dibuat GPT untuk Anda. Di dashboard, klik **Open report file**, lalu pilih file itu. Cek tanggal laporan dan sumber di bawah angka. Klik **Details** pada kartu untuk melihat grafik dan tabel.
-
-Saat ingin memperbarui laporan, kirim **“Perbarui Performance Desk saya dengan hasil terbaru dari akun yang sudah tersedia.”** di chat pengaturan yang sama. Ambil file terbaru, kemudian buka lagi di dashboard. File JSON dibaca di browser dan perlu dipilih kembali jika halaman ditutup.
+Baca [panduan Connect](SYNC.md) untuk lokasi API key, cara menyambungkan ulang, dan pengaturan sinkronisasi. Selama aplikasi berjalan, Garmin diperiksa setiap **60 menit** dan Intervals.icu setiap **15 menit**. **Sync now** meminta pemeriksaan lebih awal sesuai jeda yang diizinkan sumber.
 
 ## Isi dashboard
 
-- **Daily** menampilkan recovery, metrik Garmin, Fitness Intervals.icu, dan saran latihan ringan bila pembacaan recovery berasal dari hari yang sama.
-- **Trends** menampilkan kecepatan cycling dan pace running, dengan filter Indoor dan Outdoor. Strength menampilkan total kg untuk sesi yang mencatat beban.
-- **Predictions** menampilkan perkiraan HR pada target watt atau pace, dan referensi dari latihan yang sebelumnya berada di bawah batas HR. Estimasi memerlukan data berpasangan yang sebanding. Kolom kosong berarti bukti belum cukup.
-- **Benchmarks, Plan, Archive, dan Reference** menampilkan rekaman pribadi, rencana yang tersimpan, riwayat, dan dasar pembacaan. Bagian ini bertambah ketika arsip Performance Desk tersedia.
-- **Details** membuka grafik di atas tabel sumber dan tanggal. Grafik mengikuti pembacaan yang tersedia.
-
-## Privasi dan batas integrasi
-
-Template ini membaca file laporan di browser. Simpan file JSON dan ekspor Anda di komputer atau tempat penyimpanan pribadi. Repo ini boleh dibagikan karena isinya hanya kode, prompt, dan struktur laporan kosong. Tambahkan integrasi akun hanya melalui akses resmi yang Anda setujui. Halaman ini tidak menjalankan sinkronisasi otomatis atau menyimpan sesi login akun olahraga.
-
-Akses browser yang sudah login bergantung pada alat dan izin yang tersedia di chat Anda. Ekspor file tetap bisa dipakai tanpa akses browser otomatis. Jika ingin membuka laporan dari beberapa perangkat, minta GPT membangun salinan pribadi dengan izin pemilik. Simpan hanya template kosong di hosting atau repo publik.
-
-## Bantuan cepat
-
-| Yang terlihat | Langkah berikutnya |
+| Tab | Yang bisa Anda lihat |
 |---|---|
-| **No report open** | Klik **Open report file** dan pilih file JSON dari GPT. |
-| **Choose a Performance Desk JSON report** | Pastikan file yang dipilih adalah hasil akhir dari GPT. Arsip ZIP, CSV, dan FIT adalah bahan untuk GPT. |
-| Data Garmin atau Intervals.icu kosong | Cek rentang tanggal ekspor, izin, atau apakah metrik memang direkam. Minta GPT mengisi daftar data yang masih diperlukan. |
-| **Needs paired efforts** | Gunakan rekaman yang memiliki HR dan watt atau pace dari blok steady yang sama. Rerata dari dua aktivitas berbeda tidak cukup. |
-| Aktivitas muncul dua kali | Minta GPT mencocokkan sumber berdasarkan waktu mulai, olahraga, durasi, dan jarak, lalu memberi salinan yang terverifikasi satu `sessionKey`. |
+| **Daily** | Training Load Garmin, Workout Suggestion, Training Status, Body metrics, dan target pacing yang tersedia. |
+| **Trends** | Acute load, chronic load, rasio dan rentang optimal yang tersedia, Fitness/Fatigue/Form Intervals.icu, Load Focus, resting HR, serta perkembangan cycling, running, dan strength. Gunakan filter Indoor atau Outdoor untuk membandingkan sesi. |
+| **Benchmarks** | Rekor pribadi dan metrik dari sesi yang tersedia. |
+| **Predictions** | Perkiraan HR pada target watt atau pace, referensi usaha di bawah batas HR, dan perbandingan prediksi dengan catatan aktual jika data mendukung. |
+| **Plan** | Rencana dan target yang tersimpan di laporan. |
+| **Archive** | Riwayat data dan aktivitas berdasarkan tanggal. |
+| **Reference** | Sumber yang tersedia dan cakupan datanya. |
 
-Spesifikasi yang dipakai GPT ada di [DATA-FORMAT.md](DATA-FORMAT.md). File [report.blank.json](report.blank.json) adalah kerangka kosong untuk dokumentasi.
+Klik **Details** pada kartu untuk membaca grafik, lalu tabel riwayat. Grafik yang mendukung penunjuk menampilkan tanggal dan nilai saat Anda mengarahkan kursor. Tata letak menyesuaikan layar desktop, tablet, dan ponsel.
+
+## Menggunakan riwayat yang sudah ada
+
+- Jika sudah punya arsip Performance Desk, ikuti bagian [impor arsip pribadi](SYNC.md#jika-sudah-punya-arsip-performance-desk). Arsip membantu melengkapi metrik dan rekaman historis yang tersedia. Jika tanggal dan sumbernya sama, pembacaan API terbaru didahulukan untuk tiap nilai yang tersedia.
+- Untuk membaca laporan JSON yang sudah jadi, pilih **Open report file** di browser. Ini juga tersedia di preview. [Prompt untuk ChatGPT](SETUP-PROMPT.md) dapat membantu menyiapkan file laporan. Koneksi akun dan sinkronisasi rutin berjalan langsung di aplikasi lokal.
+- Prediksi memerlukan rekaman HR dan watt atau pace yang terukur bersama pada usaha sebanding. Cakupan tiap kartu bergantung pada data yang disediakan akun Anda.
+
+## Privasi dan berbagi
+
+[Preview GitHub Pages](https://ilham-rizaldi.github.io/performance-desk-starter/) berisi template kosong yang siap dibagikan. Koneksi akun, arsip, dan data sinkronisasi disimpan di komputer Anda. Masukkan API key hanya di dashboard lokal dan gunakan **Disconnect** untuk memutus koneksi dari aplikasi.
+
+Format laporan tersedia di [DATA-FORMAT.md](DATA-FORMAT.md). [report.blank.json](report.blank.json) adalah contoh struktur kosong.
