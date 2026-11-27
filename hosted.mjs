@@ -89,12 +89,13 @@ async function refresh(id, row, env, key, manual, now, fetchProvider) {
 }
 
 export async function starterRequest(request, env, { publisher = false, fetchProvider = upstream } = {}) {
+  const publisherStatus = request.method === "GET" && new URL(request.url).searchParams.has("sync-request");
   if (request.method === "OPTIONS" && request.headers.get("Origin") === githubOrigin) {
     return new Response(null, { status: 204, headers: { ...headers, "Access-Control-Allow-Methods": "GET, POST",
       "Access-Control-Allow-Headers": "Authorization" } });
   }
   const referenceUpload = request.method === "PUT";
-  if (referenceUpload ? !publisher : request.headers.get("Origin") !== githubOrigin || !await authorized(request, env)) {
+  if (referenceUpload || publisherStatus ? !publisher : request.headers.get("Origin") !== githubOrigin || !await authorized(request, env)) {
     return json({ error: "Open your private Performance Desk bookmark." }, 403);
   }
   if (!["GET", "POST", "PUT"].includes(request.method)) return json({ error: "Method not allowed." }, 405);
@@ -102,6 +103,10 @@ export async function starterRequest(request, env, { publisher = false, fetchPro
     const key = await cacheKey(env);
     await setup(env.DB);
     const now = Date.now();
+    if (publisherStatus) {
+      const queued = await env.DB.prepare("SELECT attempted_at FROM starter_cache WHERE id='sync-request'").first();
+      return json({ requestedAt: queued?.attempted_at ?? 0 });
+    }
     if (referenceUpload) {
       const reader = request.body?.getReader();
       if (!reader) return json({ error: "Archive data required." }, 400);
@@ -120,6 +125,18 @@ export async function starterRequest(request, env, { publisher = false, fetchPro
         }
       } finally { reader.releaseLock(); }
       const reference = JSON.parse(text + stream.decode());
+      if (reference?.type === "provider-snapshots") {
+        const incoming = Object.entries(reference.sources ?? {}).filter(([id, slot]) => Object.hasOwn(providers, id)
+          && Number.isSafeInteger(slot?.syncedAt) && slot.syncedAt > 0 && slot.syncedAt <= now + 60000
+          && Array.isArray(slot?.data?.wellness) && Array.isArray(slot?.data?.activities));
+        if (!incoming.length) return json({ error: "No provider snapshots received." }, 400);
+        await Promise.all(incoming.map(async ([id, slot]) => {
+          const payload = await seal({ ...slot.data, refreshMode: "mac" }, key, id);
+          await env.DB.prepare("INSERT INTO starter_cache VALUES (?,?,?,NULL,?) ON CONFLICT(id) DO UPDATE SET attempted_at=excluded.attempted_at, synced_at=excluded.synced_at, problem=NULL, payload=excluded.payload WHERE starter_cache.synced_at IS NULL OR starter_cache.synced_at<=excluded.synced_at")
+            .bind(id, now, slot.syncedAt, payload).run();
+        }));
+        return json({ accepted: incoming.map(([id]) => id) });
+      }
       if (reference?.version !== 1 || !/^\d{4}-\d{2}-\d{2}$/.test(reference.reportDate ?? "")
         || !Array.isArray(reference.wellness) || !Array.isArray(reference.activities) || !Array.isArray(reference.efforts)) {
         return json({ error: "Invalid reference archive." }, 400);
@@ -132,15 +149,25 @@ export async function starterRequest(request, env, { publisher = false, fetchPro
     }
     const readState = async () => new Map((await savedRows(env.DB)).results.map(row => [row.id, row]));
     let state = await readState();
-    await Promise.all(Object.keys(providers).map(id => refresh(id, state.get(id), env, key, request.method === "POST", now, fetchProvider)));
-    state = await readState();
     const cache = new Map();
+    for (const id of Object.keys(providers)) {
+      const snapshot = await open(state.get(id)?.payload, key, id);
+      if (snapshot) cache.set(id, snapshot);
+    }
+    const mac = [...cache.values()].some(snapshot => snapshot.refreshMode === "mac");
+    if (mac && request.method === "POST") {
+      await env.DB.prepare("INSERT INTO starter_cache (id, attempted_at) VALUES ('sync-request',?) ON CONFLICT(id) DO UPDATE SET attempted_at=excluded.attempted_at WHERE starter_cache.attempted_at<=?")
+        .bind(now, now - refreshFloor).run();
+    }
+    if (!mac) await Promise.all(Object.keys(providers).map(id => refresh(id, state.get(id), env, key, request.method === "POST", now, fetchProvider)));
+    state = await readState();
     for (const id of Object.keys(providers)) {
       const snapshot = await open(state.get(id)?.payload, key, id);
       if (snapshot) cache.set(id, snapshot);
     }
     const reference = await open(state.get("reference")?.payload, key, "reference");
     return json({
+      refreshMode: mac ? "mac" : "hosted",
       connections: Object.keys(providers).map(id => {
         const row = state.get(id);
         return { id, name: sources[id], connected: true, lastSync: row?.synced_at && new Date(row.synced_at).toISOString(),

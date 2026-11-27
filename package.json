@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node sync.mjs",
+    "publish:live": "node publish-live.mjs",
     "test": "node --test sync.test.mjs hosted.test.mjs"
   },
   "dependencies": {

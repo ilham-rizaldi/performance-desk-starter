@@ -5,7 +5,7 @@ export default {
   async fetch(request, env) {
     if (new URL(request.url).pathname !== "/api/starter") return legacy.fetch(request, env);
     const authorization = request.headers.get("Authorization");
-    const publisher = request.method === "PUT" && authorization !== null
+    const publisher = (request.method === "PUT" || new URL(request.url).searchParams.has("sync-request")) && authorization !== null
       && await legacy.publisherAllowed(authorization, env);
     return starterRequest(request, env, { publisher });
   },

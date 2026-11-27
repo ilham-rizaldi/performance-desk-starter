@@ -163,7 +163,8 @@
       if (hosted && !hostedToken) return;
       show(state);
       const connected = state.connections.filter(source => source.connected);
-      feedback.textContent = connected.some(source => source.error) ? "Some data could not sync. Check Connect accounts for details."
+      feedback.textContent = state.refreshMode === "mac" ? "Refresh requested. The syncing Mac checks for requests every minute."
+        : connected.some(source => source.error) ? "Some data could not sync. Check Connect accounts for details."
         : connected.some(source => source.lastSync && source.lastSync !== before.get(source.id)) ? "Sync complete."
         : "A refresh is not available yet. Check your last sync time in Connect accounts.";
     } catch (error) { feedback.textContent = error.message; }

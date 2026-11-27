@@ -8,7 +8,7 @@ Performance Desk combines Garmin Connect and Intervals.icu data into a personal 
 
 The GitHub Pages URL is the main dashboard. The owner’s private bookmark opens the live Garmin Connect and Intervals.icu data on that page. The public page opens without personal readings. Keep the private bookmark in your browser or password manager, and use **Lock** when you finish on a shared device.
 
-The private backend checks Garmin hourly and Intervals.icu every 15 minutes while the dashboard is open. **Sync now** requests an earlier refresh when the service allows it. Imported archive readings keep their original dates. The local installation below is available for anyone who wants to connect their own accounts.
+The owner's private sync process checks Garmin hourly and Intervals.icu every 15 minutes while the syncing computer is online and the process is running. **Sync now** requests an earlier refresh through that computer. The dashboard opens remotely with the latest successful snapshot. Imported archive readings keep their original dates. The local installation below is available for anyone who wants to connect their own accounts.
 
 ## Easiest install with Codex
 
