@@ -78,6 +78,22 @@ test("manual reports accept only the same two providers as automatic sync", () =
   assert.deepEqual(report.activities.map(row => row.source), providers);
 });
 
+test("prediction availability uses comparable efforts on different days within the same sport and environment", () => {
+  const { hasComparableEfforts, matchingEfforts, hrEstimate } = globalThis.PerformanceData;
+  const ride = { date: "2026-01-01", sport: "Cycling", environment: "Outdoor", minutes: 10, effort: 100, bpm: 125 };
+  const sameDay = { ...ride, effort: 106, bpm: 130 };
+  const differentDay = { ...ride, date: "2026-01-02", effort: 116, bpm: 139 };
+  const outdoor = rows => matchingEfforts(rows, "Cycling", "Outdoor");
+  assert.equal(hasComparableEfforts(outdoor([ride, sameDay]), "Cycling"), false);
+  assert.equal(hasComparableEfforts(outdoor([ride, { ...differentDay, effort: 160 }]), "Cycling"), false);
+  assert.equal(hasComparableEfforts(outdoor([ride, { ...differentDay, environment: "Indoor" }]), "Cycling"), false);
+  assert.equal(hasComparableEfforts(outdoor([ride, { ...differentDay, minutes: 7 }]), "Cycling"), false);
+  assert.equal(hasComparableEfforts(outdoor([differentDay, ride]), "Cycling"), true);
+  assert.equal(hrEstimate(outdoor([ride, differentDay]), 108, "Cycling").bpm, 132);
+  assert.equal(hasComparableEfforts([{ ...ride, effort: 360 }, { ...differentDay, effort: 410 }], "Running"), true);
+  assert.equal(hasComparableEfforts([{ ...ride, effort: 360 }, { ...differentDay, effort: 411 }], "Running"), false);
+});
+
 test("a private archive fills historical gaps without replacing live readings or reopening a disconnected source", () => {
   const reference = projectReference({
     schemaVersion: 1, date, wellness: { date, restingHr: 51, readiness: 74, bodyBattery: 70 },

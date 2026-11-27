@@ -119,7 +119,11 @@
 
   function showHistory(title, rows, options = {}) {
     const container = element("detail-content");
-    container.replaceChildren(graphic(rows, { ...options, label: title }));
+    const tableRows = options.tableRows ?? rows;
+    container.replaceChildren();
+    if (rows.length || options.overlay?.length || !tableRows.length) {
+      container.append(graphic(rows, { label: title, ...options }));
+    }
     const wrapper = node("div", null, "table-wrap");
     const table = node("table");
     const columns = options.columns || ["Date", options.unit || "Value", "Source"];
@@ -127,7 +131,7 @@
     for (const title of columns) headings.append(node("th", title));
     head.append(headings);
     const body = node("tbody");
-    for (const row of [...rows].reverse()) {
+    for (const row of [...tableRows].reverse()) {
       const tr = node("tr");
       const values = options.row ? options.row(row) : [row.date, (options.format || fmt)(row.value), row.source];
       for (const value of values) tr.append(node("td", value));
@@ -135,7 +139,7 @@
     }
     table.append(head, body);
     wrapper.append(table);
-    if (rows.length) container.append(wrapper);
+    if (tableRows.length) container.append(wrapper);
     element("detail-title").textContent = title;
     element("details").showModal();
   }
@@ -190,30 +194,30 @@
     list.replaceChildren();
     const grid = node("div", null, "grid");
     for (const sport of model.sports) {
+      const strength = sport === "Strength";
+      const run = sport === "Running";
+      const sessions = (report?.activities || []).filter(row => row.sport === sport && (strength ? row.liftedKg != null : row.km && row.minutes));
+      if (!sessions.length) continue;
       const panel = card(sport);
-      const sessions = (report?.activities || []).filter(row => row.sport === sport);
       const label = node("label", "Environment ", "muted");
       const select = node("select");
-      for (const text of ["All","Indoor","Outdoor"]) {
+      for (const text of ["All", ...["Indoor", "Outdoor"].filter(value => sessions.some(row => row.environment === value))]) {
         const option = node("option", text);
         option.value = text;
         select.append(option);
       }
       label.append(select);
-      if (sport !== "Strength") panel.append(label);
+      if (!strength && select.options.length > 1) panel.append(label);
       const view = node("div");
-      const strength = sport === "Strength";
-      const run = sport === "Running";
       const title = strength ? "Strength volume" : run ? "Run pace" : "Ride speed";
       const format = strength ? value => fmt(value) + " kg" : run ? value => pace(value) + "/km" : value => fmt(value) + " km/h";
       function update() {
         view.replaceChildren();
         const filtered = sessions.filter(row => select.value === "All" || row.environment === select.value);
-        const rows = filtered.map(row => ({ ...row, value: strength ? row.liftedKg : row.km && row.minutes
-          ? (run ? 60 * row.minutes / row.km : 60 * row.km / row.minutes) : null })).filter(row => row.value != null);
+        const rows = filtered.map(row => ({ ...row, value: strength ? row.liftedKg : run ? 60 * row.minutes / row.km : 60 * row.km / row.minutes }));
         const readout = strength && rows.length ? rows.reduce((sum, row) => sum + row.value, 0) : rows.at(-1)?.value;
         view.append(node("p", readout == null ? "—" : format(readout), "metric"),
-          node("small", filtered.length + " sessions · " + rows.length + " with " + title.toLowerCase()),
+          node("small", rows.length + (rows.length === 1 ? " session" : " sessions")),
           graphic(rows, { color: strength ? "violet" : run ? "green" : "cyan", format, label: title }));
         detailsButton(view, title, rows, { format, columns: ["Date", "Environment", "Time", title, "Sources"],
           row: row => [row.date, row.environment || "—", row.minutes == null ? "—" : fmt(row.minutes) + " min", format(row.value), row.sources.join(", ")] });
@@ -223,7 +227,8 @@
       panel.append(view);
       grid.append(panel);
     }
-    list.append(...panels.trends(), grid);
+    list.append(...panels.trends());
+    if (grid.childElementCount) list.append(node("h2", "Performance progression", "subsection-title"), grid);
   }
 
   function showPredictions() {
@@ -231,12 +236,18 @@
     root.replaceChildren();
     const grid = node("div", null, "grid");
     for (const sport of ["Cycling", "Running"]) {
+      const evidence = new Map();
+      for (const environment of ["Outdoor", "Indoor"]) {
+        const efforts = model.matchingEfforts(report?.efforts || [], sport, environment);
+        if (model.hasComparableEfforts(efforts, sport)) evidence.set(environment, efforts);
+      }
+      if (!evidence.size) continue;
       const ride = sport === "Cycling";
       const panel = card(sport);
       const controls = node("div", null, "controls");
       const environmentLabel = node("label", "Environment");
       const environment = node("select");
-      for (const value of ["Outdoor", "Indoor"]) environment.append(node("option", value));
+      for (const value of evidence.keys()) environment.append(node("option", value));
       environmentLabel.append(environment);
       const targetLabel = node("label", ride ? "Target watts" : "Target pace (min/km)");
       const target = node("input");
@@ -250,20 +261,25 @@
       ceiling.min = "30";
       ceiling.max = "260";
       ceilingLabel.append(ceiling);
-      controls.append(environmentLabel, targetLabel, ceilingLabel);
+      if (evidence.size > 1) controls.append(environmentLabel);
+      else panel.append(node("small", environment.value));
+      controls.append(targetLabel, ceilingLabel);
       const outcome = node("div", null, "stack");
       function update() {
-        const rows = model.matchingEfforts(report?.efforts || [], sport, environment.value);
+        const rows = evidence.get(environment.value);
+        const hasCeiling = new Set(rows.filter(row => row.peakHR != null).map(row => row.date)).size >= 2;
+        ceilingLabel.hidden = !hasCeiling;
         const entered = ride ? target.valueAsNumber : parsePace(target.value);
         const predicted = model.hrEstimate(rows, entered, sport);
-        const atCeiling = model.ceilingReference(rows, ceiling.valueAsNumber, sport);
+        const atCeiling = hasCeiling ? model.ceilingReference(rows, ceiling.valueAsNumber, sport) : null;
         const output = predicted ? predicted.bpm + " bpm" : "—";
         const boundary = atCeiling?.reference;
         const formatEffort = value => ride ? fmt(value) + " W" : pace(value) + "/km";
         outcome.replaceChildren(
           node("h3", "HR at target " + (ride ? "power" : "pace")), node("p", output, "metric"),
           node("small", predicted ? predicted.low + "–" + predicted.high + " bpm across " + predicted.days + " comparable days"
-            : "Needs paired efforts on two comparable days within the recorded range."),
+            : "Enter a target within the range of comparable efforts."));
+        if (hasCeiling) outcome.append(
           node("h3", (ride ? "Power" : "Pace") + " at HR ceiling"), node("p", boundary == null ? "—" : formatEffort(boundary), "metric"),
           node("small", atCeiling ? atCeiling.over + " of " + atCeiling.days + " measured days exceeded the ceiling. The reference needs two days within the ceiling."
             : "Enter a ceiling to check measured peaks." ));
@@ -283,11 +299,10 @@
           return { ...row, expected: model.hrEstimate(prior, row.effort, sport)?.bpm };
         });
         const expected = audit.filter(row => Number.isFinite(row.expected)).map(row => ({ date: row.date, value: row.expected }));
+        if (!expected.length) return;
         const panel = node("div", null, "prediction-audit");
-        panel.append(node("h3", "Predicted vs actual HR"), node("small", expected.length
-          ? expected.length + " days with earlier comparable data"
-          : "Earlier comparable efforts are needed for a prediction check."));
-        if (actual.length) panel.append(graphic(actual, { label: "Predicted and actual heart rate", color: "pink", overlay: expected, overlayColor: "cyan" }));
+        panel.append(node("h3", "Predicted vs actual HR"), node("small", expected.length + " days with earlier comparable data"),
+          graphic(actual, { label: "Predicted and actual heart rate", color: "pink", overlay: expected, overlayColor: "cyan" }));
         detailsButton(panel, sport + " HR comparison", audit, { color: "pink", overlay: expected, overlayColor: "cyan",
           columns: ["Date", "Effort", "Actual HR", "Predicted HR", "Source"],
           row: row => [row.date, formatEffort(row.effort), fmt(row.bpm) + " bpm", row.expected == null ? "—" : fmt(row.expected) + " bpm", row.source] });
@@ -298,28 +313,39 @@
       panel.append(controls, outcome);
       grid.append(panel);
     }
-    root.append(grid);
+    if (grid.childElementCount) root.append(grid);
   }
 
   const panels = globalThis.PerformancePanels({ node, card, fmt, pace, graphic, metric, valuesFor, showHistory, detailsButton,
     getReport: () => report, currentDate: model.currentDate, colors: metricColors });
+
+  const viewButtons = [...document.querySelectorAll("[data-view]")];
+  const more = element("additional-views");
+  const extraButtons = viewButtons.filter(button => more.contains(button));
+
+  function selectView(button, focus = false) {
+    for (const current of viewButtons) {
+      element(current.dataset.view).hidden = current !== button;
+      if (current === button) current.setAttribute("aria-current", "page");
+      else current.removeAttribute("aria-current");
+    }
+    more.open = false;
+    if (focus) element(button.dataset.view + "-title").focus();
+  }
 
   function render() {
     showDaily(); showTrends(); showPredictions();
     for (const name of ["benchmarks", "plan", "archive", "reference"]) {
       element(name + "-content").replaceChildren(...panels[name]());
     }
+    for (const button of extraButtons) button.hidden = !element(button.dataset.view + "-content").childElementCount;
+    more.hidden = extraButtons.every(button => button.hidden);
+    if (more.hidden) more.open = false;
+    const selected = viewButtons.find(button => button.hasAttribute("aria-current"));
+    if (selected?.hidden) selectView(viewButtons[0], true);
   }
-  for (const button of document.querySelectorAll("[data-view]")) {
-    button.addEventListener("click", () => {
-      const selected = button.dataset.view;
-      for (const current of document.querySelectorAll("[data-view]")) {
-        element(current.dataset.view).hidden = current !== button;
-        if (current === button) current.setAttribute("aria-current", "page");
-        else current.removeAttribute("aria-current");
-      }
-      element(selected + "-title").focus();
-    });
+  for (const button of viewButtons) {
+    button.addEventListener("click", () => { if (!button.hidden) selectView(button, true); });
     element(button.dataset.view + "-title").tabIndex = -1;
   }
 

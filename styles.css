@@ -30,6 +30,11 @@ body { margin: 0; }
 nav { display: flex; flex-wrap: wrap; gap: 5px; }
 nav button { border-color: transparent; background: transparent; }
 nav button[aria-current="page"] { background: #1a2315; color: var(--lime); border-color: #607b45; }
+#additional-views { position: relative; }
+#additional-views > summary { cursor: pointer; border: 1px solid transparent; border-radius: 9px; padding: 8px 12px; }
+#additional-views > summary:hover, #additional-views:has(button[aria-current]) > summary { color: var(--lime); border-color: #607b45; }
+.additional-views { position: absolute; z-index: 2; inset: 100% 0 auto auto; display: grid; min-width: max-content; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); }
+.additional-views button { text-align: left; }
 button, input, select, .import {
   border: 1px solid var(--border); background: #1b2128; color: inherit; font: inherit;
   border-radius: 9px; padding: 8px 12px;
@@ -119,6 +124,7 @@ dialog::backdrop { background: #030506bc; }
 .metric-status { color: var(--green); }
 .training-status-line strong { font-size: 23px; }
 .load-and-fitness, .pace-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.load-and-fitness:has(> :only-child), .pace-grid:has(> :only-child) { grid-template-columns: minmax(0,1fr); }
 .body-grid + .load-and-fitness { margin-top: 12px; }
 .pacing-card h2 { display: flex; justify-content: space-between; align-items: baseline; }
 .pacing-length { font-size: 20px; color: var(--accent); }
@@ -148,6 +154,6 @@ dialog::backdrop { background: #030506bc; }
 @media (max-width: 1319px) { .body-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
 @media (max-width: 1023px) { .daily-lead { grid-template-columns: repeat(8,minmax(0,1fr)); } .daily-lead > .load-panel, .daily-lead > .workout-panel { grid-column: 1 / -1; } }
 @media (max-width: 767px) { .status-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .daily-lead, .load-and-fitness, .pace-grid { grid-template-columns: minmax(0,1fr); } .bar nav { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); } .bar nav button { text-align: left; } }
-@media (max-width: 560px) { .body-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .bar nav { order: 4; width: 100%; } .bar nav button { padding: 5px 6px; font-size: 13px; } .header-row { gap: 7px; } #show-connections { margin-left: auto; } .import { padding: 5px 8px; } }
+@media (max-width: 560px) { .body-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .bar nav { order: 4; width: 100%; } .bar nav button, #additional-views > summary { padding: 5px 6px; font-size: 13px; } .header-row { gap: 7px; } #show-connections { margin-left: auto; } .import { padding: 5px 8px; } }
 
 .prediction-audit { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #080a0c; }

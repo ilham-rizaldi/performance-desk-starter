@@ -19,7 +19,7 @@ Siapkan Performance Desk pribadi saya di komputer ini. Pakai versi terbaru dari 
 
 Gunakan Garmin Connect Personal API dan Intervals.icu untuk membaca data akun saya. Saya akan memasukkan password dan kode verifikasi di situs resmi masing-masing, dan API key di dashboard lokal. Jaga data dan pengaturan di komputer saya. Jangan minta kredensial di chat, mengubah data atau jadwal latihan di akun saya, atau memublikasikan laporan dan kredensial.
 
-Utamakan Daily, Trends, dan Archive dengan data yang berhasil masuk. Bila kartu seperti Training Status, Plan, atau Predictions belum punya pembacaan yang diperlukan, jelaskan singkat apa yang kurang. Gunakan data yang benar-benar tercatat, termasuk untuk HR, watt, dan pace. Akhiri dengan tautan dashboard lokal, status dan waktu Last synced masing-masing akun, serta apakah ada langkah yang masih perlu saya lakukan.
+Mulai di Daily, Trends, dan Archive. Setelah satu akun tersambung, tunjukkan satu pembacaan bertanggal dan cara membuka riwayatnya lewat Details atau Archive. Training Load, Training Status, dan Workout Suggestion tetap terlihat. Menu More muncul saat ada data untuk Benchmarks, Predictions, Plan, atau Reference. Cari Pacing Cards di Plan saat target sudah tersimpan. Jelaskan singkat bila ada data penting yang belum disediakan akun saya. Gunakan data yang benar-benar tercatat, termasuk HR, watt, dan pace. Akhiri dengan tautan dashboard lokal, status dan waktu Last synced masing-masing akun, serta langkah yang masih perlu saya lakukan.
 ```
 
 [Panduan Connect langkah demi langkah](SYNC.md) · [README](README.md)

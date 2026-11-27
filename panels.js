@@ -8,6 +8,7 @@
     const datedRows = () => list(getReport()?.wellness).filter(row => row.source === garmin);
     const range = (target, format = fmt) => Array.isArray(target) && target.length === 2 && target.every(Number.isFinite)
       ? target.map(format).join("–") : null;
+    const hasFitness = () => ["fitness", "fatigue", "form"].some(field => newest(field, intervals));
 
     function header(panel, source, date) {
       const meta = node("div", null, "panel-meta");
@@ -145,13 +146,23 @@
     function fitness() {
       const panel = card("Fitness", "fitness-panel");
       const fc = valuesFor("fitness", intervals).slice(-42), at = valuesFor("fatigue", intervals).slice(-42), form = valuesFor("form", intervals).slice(-42);
-      header(panel, intervals, fc.at(-1)?.date);
+      const history = new Map();
+      for (const [field, series] of [["fitness", fc], ["fatigue", at], ["form", form]]) {
+        for (const row of series) history.set(row.date, { ...history.get(row.date), date: row.date, [field]: row.value });
+      }
+      const days = [...history.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-42);
+      header(panel, intervals, days.at(-1)?.date);
       const stats = node("div", null, "load-readouts");
-      stats.append(readout("Fitness", fc.at(-1)?.value), readout("Fatigue", at.at(-1)?.value, "violet"), readout("Form", form.at(-1)?.value, "green"));
-      panel.append(stats, graphic(fc, { overlay: at, overlayColor: "violet", label: "Intervals.icu fitness and fatigue" }));
+      if (fc.length) stats.append(readout("Fitness", fc.at(-1).value));
+      if (at.length) stats.append(readout("Fatigue", at.at(-1).value, "violet"));
+      if (form.length) stats.append(readout("Form", form.at(-1).value, "green"));
+      panel.append(stats);
+      if (fc.length || at.length) panel.append(graphic(fc, { overlay: at, overlayColor: "violet", label: "Intervals.icu fitness and fatigue" }));
       if (form.length) panel.append(node("small", "Form"), graphic(form, { color: "green", label: "Intervals.icu form" }));
-      detailsButton(panel, "Fitness", fc, { overlay: at, overlayColor: "violet", columns: ["Date", "Fitness", "Fatigue", "Form"],
-        row: item => [item.date, fmt(item.value), fmt(at.find(row => row.date === item.date)?.value), fmt(form.find(row => row.date === item.date)?.value)] });
+      detailsButton(panel, "Fitness", fc.length || at.length ? fc : form, {
+        overlay: at, overlayColor: "violet", color: fc.length ? "cyan" : "green", tableRows: days, columns: ["Date", "Fitness", "Fatigue", "Form"],
+        row: item => [item.date, fmt(item.fitness), fmt(item.fatigue), fmt(item.form)],
+      });
       return panel;
     }
 
@@ -159,12 +170,17 @@
       const panel = card("Body metrics");
       header(panel, garmin);
       const grid = node("div", null, "metric-grid body-grid");
-      grid.append(metric("Readiness", "readiness", "/100", "pink", garmin, false), battery(),
-        metric("HRV · overnight", "hrv", "ms", "green", garmin), metric("Resting heart rate", "restingHR", "bpm", "pink", garmin),
-        sleep(), metric("Recovery", "recoveryHours", "h", "cyan", garmin));
+      if (newest("readiness")) grid.append(metric("Readiness", "readiness", "/100", "pink", garmin, false));
+      if (newest("bodyBattery")) grid.append(battery());
+      if (newest("hrv")) grid.append(metric("HRV · overnight", "hrv", "ms", "green", garmin));
+      if (newest("restingHR")) grid.append(metric("Resting heart rate", "restingHR", "bpm", "pink", garmin));
+      if (newest("sleepMinutes")) grid.append(sleep());
+      if (newest("recoveryHours")) grid.append(metric("Recovery", "recoveryHours", "h", "cyan", garmin));
       const bottom = node("div", null, "load-and-fitness");
-      bottom.append(trainingLoad(), fitness());
-      panel.append(grid, bottom);
+      bottom.append(trainingLoad());
+      if (hasFitness()) bottom.append(fitness());
+      if (grid.childElementCount) panel.append(grid);
+      panel.append(bottom);
       return panel;
     }
 
@@ -174,29 +190,34 @@
       const grid = node("div", null, "pace-grid");
       for (const [title, type, color] of [["Cycling", "cycling", "cyan"], ["Running", "running", "green"]]) {
         const plan = context?.pacing?.[type];
+        if (!plan) continue;
+        const metrics = [
+          ["Power", range(plan.power), "W", "cyan", "powerWatts"],
+          ["Heart rate", range(plan.hr), "bpm", "pink", "hrBpm"],
+          ["Pace", range(plan.pace, pace), "min/km", "green", "paceSecondsPerKm"],
+        ].filter(([, target]) => target != null);
+        if (!metrics.length && !Number.isFinite(plan.ceiling)) continue;
         const item = card(title, "pacing-card");
         item.style.setProperty("--accent", colors[color]);
-        if (plan) {
-          header(item, "Recorded plan", context.date);
-          if (Number.isFinite(plan.minutes)) item.querySelector("h2").append(node("span", fmt(plan.minutes) + " min", "pacing-length"));
-          if (Array.isArray(plan.steps)) {
-            const stages = node("div", null, "pacing-timeline");
-            plan.steps.forEach((duration, index) => { if (Number.isFinite(duration)) stages.append(node("span", fmt(duration) + " min · " + (["Warm-up", "Steady work", "Cool-down"][index] ?? "Work"))); });
-            item.append(stages);
-          }
-          const targets = node("div", null, "pacing-metrics");
-          for (const [label, target, unit, tone, field] of [["Power", range(plan.power), "W", "cyan", "powerWatts"], ["Heart rate", range(plan.hr), "bpm", "pink", "hrBpm"], ["Pace", range(plan.pace, pace), "min/km", "green", "paceSecondsPerKm"]]) {
-            if (target == null) continue;
-            const targetBlock = readout(label, target, tone, unit);
-            if (plan.evidenceDates?.[field]) targetBlock.append(node("small", "Recorded " + plan.evidenceDates[field]));
-            targets.append(targetBlock);
-          }
-          item.append(targets);
-          if (Number.isFinite(plan.ceiling)) item.append(node("p", "HR ceiling " + fmt(plan.ceiling) + " bpm", "pacing-ceiling"));
-          if (plan.adjustment) item.append(node("p", plan.adjustment, "muted"));
-        } else item.append(node("p", "Recorded pacing targets will appear when available.", "muted"));
+        header(item, "Recorded plan", context.date);
+        if (Number.isFinite(plan.minutes)) item.querySelector("h2").append(node("span", fmt(plan.minutes) + " min", "pacing-length"));
+        const stages = node("div", null, "pacing-timeline");
+        list(plan.steps).forEach((duration, index) => {
+          if (Number.isFinite(duration)) stages.append(node("span", fmt(duration) + " min · " + (["Warm-up", "Steady work", "Cool-down"][index] ?? "Work")));
+        });
+        if (stages.childElementCount) item.append(stages);
+        const targets = node("div", null, "pacing-metrics");
+        for (const [label, target, unit, tone, field] of metrics) {
+          const targetBlock = readout(label, target, tone, unit);
+          if (plan.evidenceDates?.[field]) targetBlock.append(node("small", "Recorded " + plan.evidenceDates[field]));
+          targets.append(targetBlock);
+        }
+        if (targets.childElementCount) item.append(targets);
+        if (Number.isFinite(plan.ceiling)) item.append(node("p", "HR ceiling " + fmt(plan.ceiling) + " bpm", "pacing-ceiling"));
+        if (plan.adjustment) item.append(node("p", plan.adjustment, "muted"));
         grid.append(item);
       }
+      if (!grid.childElementCount) return null;
       panel.append(grid);
       return panel;
     }
@@ -207,21 +228,23 @@
       if (!getReport()) {
         const empty = card("No report open", "empty");
         empty.append(node("p", "Connect Garmin and Intervals.icu in the private app or open a report file.", "muted"));
-        return [empty, lead, trainingStatus(), body(), pacing()];
+        return [empty, lead, trainingStatus(), body()];
       }
-      return [lead, trainingStatus(), body(), pacing()];
+      return [lead, trainingStatus(), body()];
     }
 
     function trends() {
       const pair = node("div", null, "load-and-fitness");
-      pair.append(trainingLoad(), fitness());
-      const rhr = metric("Resting heart rate", "restingHR", "bpm", "pink", garmin);
-      const focus = card("Load Focus");
+      pair.append(trainingLoad());
+      if (hasFitness()) pair.append(fitness());
+      const row = node("div", null, "load-and-fitness");
       const focusData = getReport()?.context?.loadFocus;
-      header(focus, garmin, focusData?.end);
-      if (list(focusData?.buckets).length) {
-        const scale = Math.max(1, ...focusData.buckets.flatMap(row => [row.points ?? 0, row.targetHigh ?? 0]));
-        for (const bucket of focusData.buckets) {
+      const buckets = list(focusData?.buckets).filter(bucket => Number.isFinite(bucket?.points));
+      if (buckets.length) {
+        const focus = card("Load Focus");
+        header(focus, garmin, focusData.end);
+        const scale = Math.max(1, ...buckets.flatMap(row => [row.points, Number.isFinite(row.targetHigh) ? row.targetHigh : 0]));
+        for (const bucket of buckets) {
           const [label, color] = { lowAerobic: ["Low aerobic", "green"], highAerobic: ["High aerobic", "amber"], anaerobic: ["Anaerobic", "violet"] }[bucket.key] ?? [bucket.key, "cyan"];
           const row = readout(label, bucket.points, color, "pts");
           const bar = node("div", null, "focus-bar"), fill = node("span");
@@ -237,19 +260,20 @@
           } else row.append(bar);
           focus.append(row);
         }
-      } else focus.append(node("p", "No recorded Load Focus breakdown.", "muted"));
-      const row = node("div", null, "load-and-fitness");
-      row.append(focus, rhr);
-      return [pair, row, node("h2", "Performance progression", "subsection-title")];
+        row.append(focus);
+      }
+      if (newest("restingHR")) row.append(metric("Resting heart rate", "restingHR", "bpm", "pink", garmin));
+      return row.childElementCount ? [pair, row] : [pair];
     }
 
     function benchmarks() {
       const data = getReport();
       const grid = node("div", null, "load-and-fitness");
       for (const [label, sports] of [["Cycling", /cycl|ride/i], ["Running", /run/i]]) {
-        const panel = card(label + " benchmarks"), records = list(data?.context?.records).filter(row => sports.test(row.sport ?? ""));
+        const records = list(data?.context?.records).filter(row => row?.label && row.value != null && sports.test(row.sport ?? ""));
+        if (!records.length) continue;
+        const panel = card(label + " benchmarks");
         header(panel, garmin);
-        if (!records.length) panel.append(node("p", "Personal records will appear when a verified record is available.", "muted"));
         for (const row of records) {
           const entry = node("div", null, "benchmark-entry");
           entry.append(node("span", row.label), node("strong", [row.value, row.unit].filter(value => value != null).join(" ")),
@@ -258,13 +282,14 @@
         }
         grid.append(panel);
       }
-      return [grid, trainingStatus()];
+      return grid.childElementCount ? [grid, trainingStatus()] : [];
     }
 
     function plan() {
-      const panel = card("Next session");
       const workout = getReport()?.context?.plan;
-      if (workout) {
+      const content = [];
+      if (workout?.name) {
+        const panel = card("Next session");
         header(panel, "Saved plan", workout.date);
         panel.append(node("h3", workout.name));
         if (workout.target) panel.append(node("p", workout.target, "muted"));
@@ -274,26 +299,56 @@
           detail.append(node("strong", fmt(step.minutes) + " min"), node("p", step.detail, "muted"));
           timeline.append(detail);
         }
-        panel.append(timeline);
+        if (timeline.childElementCount) panel.append(timeline);
         if (workout.alternative) panel.append(node("p", workout.alternative, "muted"));
-      } else panel.append(node("p", "No saved next session for this report.", "muted"));
-      return [panel, pacing()];
+        content.push(panel);
+      }
+      const targets = pacing();
+      if (targets) content.push(targets);
+      return content;
     }
 
     function archive() {
       const panel = card("Report archive");
       const data = getReport();
       const saved = new Map(list(data?.context?.archive).map(row => [row.date, row.title]));
-      const days = [...new Set([...saved.keys(), ...list(data?.activities).map(row => row.date)])].sort().reverse();
-      if (!days.length) panel.append(node("p", "Saved reports and recorded activities will appear here.", "muted"));
+      const history = new Map();
+      function entryFor(date) {
+        if (!history.has(date)) history.set(date, { sessions: [], readings: [] });
+        return history.get(date);
+      }
+      for (const session of list(data?.activities)) entryFor(session.date).sessions.push(session);
+      const fields = [
+        ["restingHR", "Resting heart rate", " bpm"], ["bodyBattery", "Body Battery", "/100"],
+        ["sleepMinutes", "Sleep", " min"], ["sleepScore", "Sleep score", "/100"], ["hrv", "HRV · overnight", " ms"],
+        ["readiness", "Readiness", "/100"], ["recoveryHours", "Recovery time", " h"],
+        ["acuteLoad", "Acute load", ""], ["chronicLoad", "Chronic load", ""], ["loadRatio", "Load ratio", ""],
+        ["fitness", "Fitness", ""], ["fatigue", "Fatigue", ""], ["form", "Form", ""],
+      ];
+      for (const reading of list(data?.wellness)) {
+        for (const [field, name, unit] of fields) {
+          if (reading[field] != null) entryFor(reading.date).readings.push([reading.date, name, fmt(reading[field]) + unit, reading.source]);
+        }
+      }
+      const days = [...new Set([...saved.keys(), ...history.keys()])].sort().reverse();
+      if (!days.length) panel.append(node("p", "Activities and wellness history will appear after the first sync.", "muted"));
       for (const date of days) {
+        const { sessions, readings } = entryFor(date);
+        const counts = [
+          sessions.length && sessions.length + (sessions.length === 1 ? " activity" : " activities"),
+          readings.length && readings.length + (readings.length === 1 ? " reading" : " readings"),
+        ].filter(Boolean).join(" · ");
         const row = node("button", null, "archive-entry");
         row.type = "button";
-        const sessions = data.activities.filter(session => session.date === date);
-        row.append(node("time", date), node("strong", saved.get(date) || "Recorded activities"), node("small", sessions.length + " activities"));
-        row.addEventListener("click", () => showHistory(date, sessions.map(item => ({ ...item, value: item.minutes })).filter(item => item.value != null), {
-          unit: "Duration (min)", columns: ["Date", "Session", "Duration", "Source"], row: item => [item.date, item.name || item.sport, fmt(item.minutes) + " min", item.source],
-        }));
+        row.append(node("time", date), node("strong", saved.get(date) || (sessions.length ? "Recorded activities" : "Wellness readings")), node("small", counts));
+        row.addEventListener("click", () => {
+          const durations = sessions.filter(item => item.minutes != null).map(item => ({ ...item, value: item.minutes }));
+          const activities = sessions.map(item => [date, item.name || item.sport, item.minutes == null ? "—" : fmt(item.minutes) + " min", item.sources.join(", ")]);
+          showHistory(date, durations, {
+            label: "Session duration", format: value => fmt(value) + " min",
+            tableRows: [...readings, ...activities], columns: ["Date", "Activity or reading", "Value", "Source"], row: item => item,
+          });
+        });
         panel.append(row);
       }
       return [panel];
@@ -302,21 +357,28 @@
     function reference() {
       const data = getReport(), origins = card("Data sources"), thresholds = card("Threshold review");
       for (const name of [garmin, intervals]) {
+        const wellness = list(data?.wellness).filter(row => row.source === name).length;
+        const activities = list(data?.activities).filter(row => row.sources.includes(name)).length;
+        const efforts = list(data?.efforts).filter(row => row.source === name).length;
+        if (!wellness && !activities && !efforts) continue;
         const entry = node("div", null, "benchmark-entry");
-        entry.append(node("strong", name), node("small", list(data?.wellness).filter(row => row.source === name).length + " wellness dates"),
-          node("small", list(data?.activities).filter(row => row.sources.includes(name)).length + " activities"));
+        entry.append(node("strong", name));
+        if (wellness) entry.append(node("small", wellness + " wellness dates"));
+        if (activities) entry.append(node("small", activities + " activities"));
+        if (efforts) entry.append(node("small", efforts + " paired efforts"));
         origins.append(entry);
       }
       if (data?.context?.date) origins.append(node("p", "Performance Desk archive imported through " + data.context.date + ".", "muted"));
-      const items = list(data?.context?.thresholds);
-      if (!items.length) thresholds.append(node("p", "Verified threshold readings will appear when available.", "muted"));
+      const items = list(data?.context?.thresholds).filter(row => row?.title && row.value != null);
       for (const row of items) {
         const entry = node("div", null, "benchmark-entry");
         entry.append(node("span", row.title), node("strong", [row.value, row.unit].filter(value => value != null).join(" ")),
           node("small", [row.status, row.date].filter(Boolean).join(" · ")));
         thresholds.append(entry);
       }
-      return [origins, thresholds];
+      const content = origins.childElementCount > 1 ? [origins] : [];
+      if (items.length) content.push(thresholds);
+      return content;
     }
 
     return { daily, trends, benchmarks, plan, archive, reference };

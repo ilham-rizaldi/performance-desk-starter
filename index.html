@@ -17,11 +17,16 @@
     <nav aria-label="Dashboard views">
       <button type="button" data-view="daily" aria-current="page">Daily</button>
       <button type="button" data-view="trends">Trends</button>
-      <button type="button" data-view="benchmarks">Benchmarks</button>
-      <button type="button" data-view="predictions">Predictions</button>
-      <button type="button" data-view="plan">Plan</button>
       <button type="button" data-view="archive">Archive</button>
-      <button type="button" data-view="reference">Reference</button>
+      <details id="additional-views" hidden>
+        <summary>More</summary>
+        <div class="additional-views">
+          <button type="button" data-view="benchmarks" hidden>Benchmarks</button>
+          <button type="button" data-view="predictions" hidden>Predictions</button>
+          <button type="button" data-view="plan" hidden>Plan</button>
+          <button type="button" data-view="reference" hidden>Reference</button>
+        </div>
+      </details>
     </nav>
     <button type="button" id="show-connections">Connect accounts</button>
     <label class="import">Open report file <input type="file" id="report-input" accept=".json,application/json"></label>

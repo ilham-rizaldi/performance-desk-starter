@@ -87,9 +87,23 @@
     return rows.filter(row => row.sport === sport && row.environment === environment && row.minutes >= 8 && row.minutes <= 15);
   }
 
+  function effortTolerance(target, sport) {
+    return sport === "Cycling" ? Math.max(8, target * .07) : 25;
+  }
+
+  function hasComparableEfforts(rows, sport) {
+    const ordered = [...rows].sort((a, b) => a.effort - b.effort);
+    return ordered.some((row, i) => {
+      const previous = ordered[i - 1];
+      if (!previous || previous.date === row.date) return false;
+      const midpoint = (previous.effort + row.effort) / 2;
+      return (row.effort - previous.effort) / 2 <= effortTolerance(midpoint, sport);
+    });
+  }
+
   function hrEstimate(rows, target, sport) {
     if (!Number.isFinite(target) || target <= 0) return null;
-    const tolerance = sport === "Cycling" ? Math.max(8, target * .07) : 25;
+    const tolerance = effortTolerance(target, sport);
     const window = rows.filter(row => Math.abs(row.effort - target) <= tolerance);
     const days = [...new Set(window.map(row => row.date))];
     if (days.length < 2 || target < Math.min(...window.map(row => row.effort)) || target > Math.max(...window.map(row => row.effort))) return null;
@@ -124,5 +138,5 @@
     return [values.year, values.month, values.day].join("-");
   }
 
-  globalThis.PerformanceData = { providers, sports, normalize, number, currentDate, matchingEfforts, hrEstimate, ceilingReference };
+  globalThis.PerformanceData = { providers, sports, normalize, number, currentDate, matchingEfforts, hasComparableEfforts, hrEstimate, ceilingReference };
 })();
