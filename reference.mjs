@@ -45,21 +45,35 @@ export function projectReference(original) {
     .map(row => ({ date: row.date, source: intervals, fitness: row.fitness, fatigue: row.fatigue,
       form: row.form ?? (Number.isFinite(row.fitness) && Number.isFinite(row.fatigue) ? row.fitness - row.fatigue : null) }));
 
-  const lifts = new Map((original.baseHistory?.strengthVolume?.sessionDetails ?? []).map(row => [String(row.activityId), row.volumeKg]));
+  const lifts = new Map((original.baseHistory?.strengthVolume?.sessionDetails ?? []).filter(row => row.activityId != null)
+    .map(row => [String(row.activityId), row]));
+  const strengthFields = row => row ? {
+    liftedKg: row.volumeKg,
+    exerciseSets: row.exerciseSets?.map(({ exercise, weightKg, reps }) => ({ exercise, weightKg, reps })),
+  } : {};
   const activities = (original.activities ?? []).flatMap(row => {
     const id = row.externalIds?.garmin;
     if (row.source !== garmin || id == null || row.classification === "non-training" || !sport[row.sport]) return [];
     return [{ id: String(id), date: row.date, name: row.name, source: garmin, sport: sport[row.sport],
       environment: environment[row.environment], minutes: minutes(row.timerSeconds ?? row.movingSeconds),
       km: row.distanceKm, avgHR: row.averageHr, avgWatts: row.measuredPowerWatts ?? row.averageRunningPowerWatts,
-      liftedKg: lifts.get(String(id)) }];
+      ...(sport[row.sport] === "Strength" ? strengthFields(lifts.get(String(id))) : {}) }];
   });
+  const knownLifts = new Set(activities.filter(row => row.sport === "Strength").map(row => row.id));
+  for (const [id, row] of lifts) {
+    if (!knownLifts.has(id)) activities.push({ id, date: row.date, name: row.name, sport: "Strength", source: garmin, ...strengthFields(row) });
+  }
   const efforts = (original.predictionEvidence?.blocks ?? []).filter(row => row.source === "Garmin original FIT" && sport[row.sport])
     .map(row => ({ date: row.date, source: garmin, sport: sport[row.sport], environment: environment[row.environment],
+      activityId: row.activityId == null ? undefined : String(row.activityId), offsetSeconds: row.startSeconds,
       minutes: minutes(row.durationSeconds), bpm: row.hrBpm, peakHR: row.peakHrBpm, watts: row.powerWatts, paceSeconds: row.paceSecondsPerKm }));
-  const context = { date: original.date, capturedAt: original.capturedAt,
+  const recoveryObservedAt = (original.sources ?? []).find(row => row.name === garmin || row.source === garmin)?.observedAt;
+  const context = { date: original.date, capturedAt: original.capturedAt, recoveryObservedAt,
     sleep: { date: latest.date, bed: w.bedTimeLocal, wake: w.wakeTimeLocal, deep: w.deepSleepMinutes, light: w.lightSleepMinutes,
-      rem: w.remSleepMinutes, awake: w.awakeMinutes, score: w.sleepScore, need: w.sleepNeedMinutes },
+      rem: w.remSleepMinutes, awake: w.awakeMinutes, score: w.sleepScore, need: w.sleepNeedMinutes,
+      restless: w.restlessMoments, overnightHR: w.averageOvernightHr, spo2: w.averageSpo2, respiration: w.averageRespiration,
+      segments: w.sleepStageTimeline?.date === latest.date && w.sleepStageTimeline?.source === garmin
+        ? w.sleepStageTimeline.segments?.map(({ stage, startAt, endAt }) => ({ stage, startAt, endAt })) : undefined },
     records: (original.performance?.records ?? []).filter(row => row.source === garmin)
       .map(({ date, label, sport, value, unit, source }) => ({ date, label, sport, value, unit, source })),
     pacing: Object.fromEntries(["cycling","running"].flatMap(key => {
@@ -70,13 +84,14 @@ export function projectReference(original) {
         ceiling: p.hrCeiling, steps: p.stepsMinutes, adjustment: p.adjustment, evidenceDates }]];
     })),
     plan: original.coaching?.nextSession && {
-      date: original.coaching.nextSession.date, name: original.coaching.nextSession.name, minutes: original.coaching.nextSession.minutes,
+      date: original.coaching.nextSession.date, name: original.coaching.nextSession.name, sport: original.coaching.nextSession.sport, minutes: original.coaching.nextSession.minutes,
       target: original.coaching.nextSession.target, condition: original.coaching.nextSession.condition,
       alternative: original.coaching.nextSession.alternative, steps: original.coaching.nextSession.steps?.map(({ name, minutes, detail }) => ({ name, minutes, detail })),
     },
     archive: [{ date: original.date, title: original.coaching?.headline }, ...(original.baseHistory?.snapshots ?? [])
       .map(row => ({ date: row.date, title: row.coaching?.headline }))],
     loadFocus: original.trainingMix?.garminLoadFocus && { end: original.trainingMix.garminLoadFocus.end,
+      estimated: /calibrated|chart-derived/i.test(original.trainingMix.garminLoadFocus.method ?? ""),
       buckets: original.trainingMix.garminLoadFocus.buckets?.map(({ key, points, targetLow, targetHigh }) => ({ key, points, targetLow, targetHigh })) },
     thresholds: (original.thresholdReview?.rows ?? []).map(({ title, value, unit, status, detail, evidence }) => ({ title, value, unit, status, detail, date: evidence?.date })),
   };
@@ -88,11 +103,13 @@ export function combineReference(live, reference, activeSources) {
   if (!reference || reference.version !== 1) return live;
   const available = row => activeSources.includes(row.source) && row.date <= live.reportDate;
   const garminAvailable = activeSources.includes(garmin) && reference.reportDate <= live.reportDate;
+  const effortKey = row => [row.source, row.activityId].join("|");
+  const liveActivityEfforts = new Set(live.efforts.filter(row => row.activityId).map(effortKey));
   return {
     ...live,
     wellness: mergeRows((reference.wellness ?? []).filter(available), live.wellness, wellnessKey),
     activities: mergeRows((reference.activities ?? []).filter(available), live.activities, activityKey),
-    efforts: [...(reference.efforts ?? []).filter(available), ...live.efforts],
+    efforts: [...(reference.efforts ?? []).filter(row => available(row) && !liveActivityEfforts.has(effortKey(row))), ...live.efforts],
     context: garminAvailable ? reference.context : undefined,
   };
 }

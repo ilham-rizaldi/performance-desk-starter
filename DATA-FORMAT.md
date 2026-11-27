@@ -1,28 +1,32 @@
-# Struktur file laporan
+# Report file format
 
-File adalah JSON dengan struktur berikut. Salin [kerangka kosong](report.blank.json), isi `reportDate` dan `timezone`, lalu masukkan data yang benar-benar tersedia ke tiga daftar. Angka berupa nilai JSON, tanpa unit di dalam nilainya. Nilai yang tidak diketahui boleh dihilangkan atau diisi `null`. Semua tanggal memakai `YYYY-MM-DD` menurut zona waktu pemilik.
+Use [report.blank.json](report.blank.json) as a starting point. Open a report with **Open report file**. Use numeric values without unit strings. Leave unknown fields out or set them to `null`.
 
-| Field | Isi |
+| Field | Value |
 |---|---|
 | `version` | `1` |
-| `reportDate` | Tanggal pembacaan laporan dalam zona waktu pemilik. Wajib saat membuka file. |
-| `timezone` | Nama zona waktu IANA, misalnya `Asia/Jakarta`. |
-| `wellness`, `activities`, `efforts` | Daftar di bawah. Gunakan `[]` jika data belum tersedia. |
+| `reportDate` | The report day in `YYYY-MM-DD` |
+| `timezone` | An IANA time zone such as `Asia/Jakarta` |
+| `wellness`, `activities`, `efforts` | Lists. Use `[]` when a list has no data. |
 
-`source` harus salah satu dari `Garmin Connect` atau `Intervals.icu`. Baris dari sumber lain dilewati. `sport` menggunakan `Cycling`, `Running`, atau `Strength`. `environment` adalah `Indoor` atau `Outdoor` dan boleh kosong pada ringkasan aktivitas bila klasifikasinya tidak pasti.
+Use `Garmin Connect` or `Intervals.icu` for `source`. For activities, use `Cycling`, `Running`, or `Strength` for `sport`. Use `Indoor` or `Outdoor` when the environment is known.
 
 ## Wellness
 
-Setiap baris wajib memiliki `date` dan `source`. Isi satu baris untuk tiap tanggal dan sumber. Garmin mengisi `readiness` dan `bodyBattery` (skor 0–100), `sleepMinutes`, `sleepScore` (skor 0–100), `restingHR` (bpm), `hrv` (ms), `recoveryHours` (jam tersisa), `acuteLoad`, `chronicLoad`, dan `loadRatio` (rasio Garmin yang direkam). Intervals.icu mengisi `fitness`, `fatigue`, dan `form` menggunakan nilai harian dari sumber tersebut. Jika suatu metrik punya cakupan khusus, gunakan tanggal pembacaan sebenarnya dan pertahankan bukti sumber di catatan pribadi.
+Enter one reading per date and source. Garmin fields include `restingHR` (bpm), `hrv` and `hrv7d` (ms), `sleepMinutes`, `sleepScore`, `readiness`, `bodyBattery`, `recoveryHours`, `acuteLoad`, `chronicLoad`, and the recorded `loadRatio`. Intervals.icu uses `fitness`, `fatigue`, and `form`.
+
+For `sleepDetails`, use local `HH:mm` for `bed` and `wake`, Unix milliseconds for `start` and `end`, and minutes for `deep`, `light`, `rem`, `awake`, and `need`. A recorded stage segment contains `stage`, `startAt`, and `endAt`, with an explicit time zone for each timestamp.
 
 ## Activities
 
-Wajib `date`, `source`, `sport`, dan `id` berupa teks. `sessionKey` opsional, sama untuk salinan lintas sumber yang sudah diverifikasi untuk olahraga dan tanggal yang sama. ID lokal yang kebetulan sama di dua penyedia tetap terpisah. Field opsional lainnya adalah `environment`, `minutes` (timer dalam menit), `km`, `avgWatts`, `avgHR` (bpm), dan `liftedKg` (total set yang tercatat).
+Each activity requires `id` as text, `date`, `source`, and `sport`. Use `sessionKey` when two records have been verified as copies of the same session. Optional fields include `environment`, `minutes`, `km`, `avgWatts`, `avgHR` (bpm), and `liftedKg` (recorded total set volume).
 
-Untuk sesi yang terverifikasi sama, pembacaan Garmin diutamakan, lalu Intervals.icu. Field yang kosong dapat diisi dari salinan yang cocok. Catat konflik penting di luar file laporan dan jangan salah menggolongkan ringkasan sebagai pengukuran blok.
+A strength `exerciseSets` item can contain `exercise`, `weightKg`, and `reps`. Keep an unnamed weighted set if the weight and reps are known. The volume total can include that set, and per-exercise records use named sets only.
 
-## Efforts
+## Steady efforts
 
-Wajib `date`, `source`, `sport`, `environment`, `minutes`, dan `bpm` dari blok steady yang sama. Cycling memakai `watts`; running memakai `paceSeconds` (detik per km). Cadangkan satu baris untuk satu blok asli. `peakHR` bersifat opsional dan hanya diisi jika puncak HR dalam blok benar-benar terukur. Model starter menggunakan blok 8–15 menit. Cantumkan hanya blok yang sebanding. Data tanjakan, lari interval, indoor, dan outdoor bisa menghasilkan respons berbeda.
+Each effort requires `date`, `source`, `sport`, `environment`, `minutes`, and `bpm` from the same steady block. Add `watts` for cycling or `paceSeconds` (seconds per km) for running. Add `peakHR` only for a measured peak in the block.
 
-HR pada target dihitung dari median per hari pada blok sejenis di dekat target. Minimal dua hari dan target perlu berada di dalam rentang rekaman yang cocok. Angka di bawah batas HR adalah referensi dari puncak terukur di dua hari, bukan jaminan. Frekuensi melampaui batas dihitung per hari yang punya puncak HR. Model menjaga konteks indoor dan outdoor secara terpisah.
+The estimate uses comparable 8–15 minute efforts. At least two earlier days must support the target. The range is based on recorded heart rates from those days. A gentler target based on a ceiling uses measured peaks.
+
+Automatically extracted blocks can also include `activityId`, `sessionStart` (Unix milliseconds), `offsetSeconds`, and `hrSeconds` as pairs of `[bpm, seconds]`. The start time is used to match an effort to a target saved before the session. Time above the ceiling covers the part of the matched block with paired heart rate and effort measurements.

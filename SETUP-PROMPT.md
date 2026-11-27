@@ -1,25 +1,23 @@
-# Setup Performance Desk dengan GPT
+# Set up Performance Desk with Codex
 
-Klik tombol **Copy** pada blok di bawah, lalu tempel di chat **Codex desktop** agar GPT bisa mengambil kode dan menjalankan dashboard di komputer Anda. Jika memakai chat yang hanya bisa memberi instruksi, prompt ini akan memandu Anda menjalankan aplikasi di komputer sendiri.
+Copy the prompt below into **Codex desktop**. It can help set up the app on your computer. Have your Garmin Connect or Intervals.icu account ready. You can start with either account.
 
-Siapkan akun Garmin Connect dan Intervals.icu milik Anda. Hubungkan satu akun dulu jika akun lainnya belum siap. Sinkronisasi berjalan lewat koneksi akun tanpa unduh atau upload laporan JSON.
-
-## Prompt siap salin
+## Copy this prompt
 
 ```text
-Siapkan Performance Desk pribadi saya di komputer ini. Pakai versi terbaru dari branch main di https://github.com/ilham-rizaldi/performance-desk-starter. Gunakan template dan fitur yang sudah ada di repo, termasuk desain dan navigasi terbaru. Baca README.md dan SYNC.md, lalu mulai kerjakan sekarang. Gunakan Bahasa Indonesia yang mudah dipahami dan beri saya satu tindakan pada satu waktu jika saya perlu klik atau masuk sendiri.
+Set up Performance Desk Starter for me using the main branch of https://github.com/ilham-rizaldi/performance-desk-starter. Use simple English. Work through the setup and give me one clear action at a time when I need to sign in, approve access, or paste a key.
 
-1. Siapkan aplikasi. Ambil repo ke folder pribadi saya. Jika sudah ada salinan, cek versinya dan pertahankan pengaturan serta koneksi lokal yang sudah tersimpan. Periksa versi Node.js sesuai package.json, jalankan npm test jika tersedia, kemudian npm start. Buka http://127.0.0.1:4176/ di browser saya dan pastikan dashboard benar-benar terbuka. Jika chat ini tidak bisa menjalankan program di komputer saya, langsung pandu saya lewat Code → Download ZIP, instal Node.js LTS bila perlu, buka folder hasil ekstrak, dan jalankan npm start. Gunakan alamat lokal untuk sambungan akun. GitHub Pages dipakai untuk preview template kosong.
+1. Read README.md and SYNC.md. Download or update the starter in a local folder. Preserve any existing private connection files and saved report data. Check that Node.js is version 20 or newer. Run npm ci, npm test, and npm start. Open http://127.0.0.1:4176/ and confirm the dashboard opens.
 
-2. Bantu hubungkan Garmin Connect. Di dashboard lokal pilih Connect accounts → Connect pada kartu Garmin Connect → Open provider settings. Saya akan masuk ke Garmin sendiri, membuat Personal API key di halaman resmi bila perlu, lalu menempelkannya langsung ke form di dashboard lokal dan menekan Connect and sync. Tunggu sampai Last synced muncul, lalu periksa apakah ada aktivitas atau pembacaan wellness Garmin.
+2. Help me connect Garmin. In the local dashboard, choose Connect accounts, then Connect on the Garmin card and Open provider settings. Let me sign in and create my Personal API key on the official site. I will paste it directly into the local app and select Connect and sync.
 
-3. Bantu hubungkan Intervals.icu. Pilih Connect pada kartu Intervals.icu. Untuk instalasi pribadi, saya akan mengambil key dari Settings → Developer Settings di Intervals.icu, menempelkannya ke form lokal, lalu menekan Connect and sync. Jika instalasi saya sudah memakai OAuth resmi, arahkan saya untuk menyetujui akses baca di halaman Intervals.icu. Cek Last synced serta Fitness, Fatigue, Form, atau aktivitas yang tersedia. Bila salah satu akun belum siap, lanjutkan dengan akun yang sudah terhubung dan beri tahu saya apa yang perlu dilakukan untuk akun kedua.
+3. Help me connect Intervals.icu in the same way if I use it. I will find my key in Settings → Developer Settings. If this installation already uses an approved OAuth app, guide me through its official consent page. Continue with whichever account is available.
 
-4. Verifikasi hasil dan biarkan aplikasi berjalan. Cek tanggal pembacaan dan satu contoh data nyata dari tiap sumber yang berhasil tersambung. Bedakan koneksi berhasil, data terlihat, dan pembaruan otomatis berikutnya. Jelaskan bahwa saat aplikasi lokal aktif, Garmin diperiksa setiap 60 menit dan Intervals.icu setiap 15 menit. Sync now meminta pemeriksaan lebih awal sesuai jeda dari sumber. Setelah komputer atau aplikasi ditutup, jalankan kembali npm start untuk melanjutkan sinkronisasi. Gunakan fitur Connect untuk semua langkah ini, tanpa ekspor atau upload JSON.
+4. Check Last synced and show me at least one reading or activity from each connected account where data is available. Show me Daily, Trends, Archive, and how Details and Historical data work. Point out Adaptive Workout below Body metrics. Explain how to save an easy target before training, then review the actual HR after a matched session. Leave my real training targets and accounts for me to manage.
 
-Gunakan Garmin Connect Personal API dan Intervals.icu untuk membaca data akun saya. Saya akan memasukkan password dan kode verifikasi di situs resmi masing-masing, dan API key di dashboard lokal. Jaga data dan pengaturan di komputer saya. Jangan minta kredensial di chat, mengubah data atau jadwal latihan di akun saya, atau memublikasikan laporan dan kredensial.
+Keep the app running so sync can continue. If you cannot run programs on my computer, walk me through downloading the ZIP and running the same commands. Use the local app for connections. The public preview is a dashboard shell that can open saved report files.
 
-Mulai di Daily, Trends, dan Archive. Setelah satu akun tersambung, tunjukkan satu pembacaan bertanggal dan cara membuka riwayatnya lewat Details atau Archive. Training Load, Training Status, dan Workout Suggestion tetap terlihat. Menu More muncul saat ada data untuk Benchmarks, Predictions, Plan, atau Reference. Cari Pacing Cards di Plan saat target sudah tersimpan. Jelaskan singkat bila ada data penting yang belum disediakan akun saya. Gunakan data yang benar-benar tercatat, termasuk HR, watt, dan pace. Akhiri dengan tautan dashboard lokal, status dan waktu Last synced masing-masing akun, serta langkah yang masih perlu saya lakukan.
+Use read access. I’ll enter passwords and codes on the official sites and keys in the local app. Keep private data and keys on my computer. Finish with my local dashboard link, the sync status, and any feature that is waiting for more data.
 ```
 
-[Panduan Connect langkah demi langkah](SYNC.md) · [README](README.md)
+[Read the connection guide](SYNC.md) · [Back to the README](README.md)

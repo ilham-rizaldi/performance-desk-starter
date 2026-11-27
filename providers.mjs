@@ -1,3 +1,5 @@
+import { fitEfforts, steadyEfforts } from "./efforts.mjs";
+
 const garmin = "https://personal.connectapi.garmin.com";
 const intervals = "https://intervals.icu";
 
@@ -34,6 +36,7 @@ async function read(url, options, request, format = "json") {
     throw new SourceError(response.status, message, retryAt);
   }
   if (response.status === 204) return null;
+  if (format === "binary") return response.arrayBuffer();
   return format === "text" ? response.text() : response.json();
 }
 
@@ -62,6 +65,26 @@ function timestamp(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function sleepReading(row) {
+  const clock = value => Number.isFinite(value) && value > 0 && value < 8.64e15
+    ? new Date(value).toISOString().slice(11, 16) : null;
+  const start = number(row.sleepStartTimestampGMT), end = number(row.sleepEndTimestampGMT);
+  const offset = Number.isFinite(start) && Number.isFinite(row.sleepStartTimestampLocal)
+    ? Math.round((row.sleepStartTimestampLocal - start) / 60000) : null;
+  return {
+    sleepMinutes: scale(row.sleepTimeSeconds, 1 / 60),
+    sleepScore: number(row.sleepScores?.overall?.value),
+    sleepStatus: row.sleepScores?.overall?.qualifierKey,
+    sleepDetails: {
+      bed: clock(row.sleepStartTimestampLocal), wake: clock(row.sleepEndTimestampLocal), start, end, offset,
+      deep: scale(row.deepSleepSeconds, 1 / 60), light: scale(row.lightSleepSeconds, 1 / 60),
+      rem: scale(row.remSleepSeconds, 1 / 60), awake: scale(row.awakeSleepSeconds, 1 / 60),
+      need: number(row.sleepNeed?.actual), awakenings: number(row.awakeCount), overnightHR: number(row.avgHeartRate),
+      spo2: number(row.averageSpO2Value), respiration: number(row.averageRespirationValue),
+    },
+  };
+}
+
 function activity(row, source) {
   const isGarmin = source === sources.garmin;
   const type = isGarmin ? row.activityType?.typeKey : row.type;
@@ -74,7 +97,8 @@ function activity(row, source) {
     ? row.startTimeGMT + "Z" : isGarmin ? row.startTimeGMT : row.start_date;
   return {
     id: String(id), date: localDate, sport, source, start: timestamp(start),
-    environment: environmentType(type),
+    environment: environmentType(type) ?? (isGarmin ? null : row.trainer === true ? "Indoor"
+      : row.stream_types?.includes("latlng") ? "Outdoor" : null),
     minutes: scale(isGarmin ? row.duration : row.moving_time, 1 / 60),
     km: scale(row.distance, 1 / 1000),
     avgHR: number(isGarmin ? row.averageHR : row.average_heartrate),
@@ -106,15 +130,51 @@ export function buildReport(cache, now = new Date()) {
   const { oldest, reportDate } = dateRange(now);
   const included = row => row.date >= oldest && row.date <= reportDate;
   const getActivities = name => (cache.get(name)?.activities ?? []).filter(included);
+  const activities = matchActivities(getActivities("garmin"), getActivities("intervals"));
+  const ids = new Map(activities.map(row => [JSON.stringify([row.source, row.id]), row.sessionKey]));
+  const efforts = [...cache.values()].flatMap(item => item.efforts ?? []).filter(included).map(row => ({
+    ...row, sessionKey: ids.get(JSON.stringify([row.source, row.activityId])),
+  }));
+  const garminSessions = new Set(efforts.filter(row => row.source === sources.garmin && row.sessionKey).map(row => row.sessionKey));
   return {
     version: 1, reportDate, timezone,
     wellness: [...cache.values()].flatMap(item => item.wellness).filter(included),
-    activities: matchActivities(getActivities("garmin"), getActivities("intervals")),
-    efforts: [],
+    activities,
+    efforts: efforts.filter(row => row.source === sources.garmin || !garminSessions.has(row.sessionKey)),
+    ...((cache.get("intervals")?.calendar ?? []).length && { plannedWorkouts: cache.get("intervals").calendar }),
   };
 }
 
-export async function syncGarmin(auth, now, request = fetch) {
+async function collectEfforts(candidates, previous, notices, load) {
+  const blocksByActivity = new Map();
+  for (const row of candidates) {
+    if (previous?.blocksByActivity?.has(row.id)) blocksByActivity.set(row.id, previous.blocksByActivity.get(row.id));
+  }
+  let streamsRetryAt = previous?.streamsRetryAt ?? 0;
+  if (Date.now() < streamsRetryAt) return { blocksByActivity, streamsRetryAt };
+  const pending = candidates.filter(row => !blocksByActivity.has(row.id)).sort((a, b) => b.start - a.start);
+  const recent = ["Cycling", "Running"].flatMap(sport => pending.filter(row => row.sport === sport).slice(0, 4));
+  const batch = [...recent, ...pending.filter(row => !recent.includes(row))].slice(0, 8);
+  for (const row of batch) {
+    try {
+      blocksByActivity.set(row.id, await load(row));
+    } catch (error) {
+      if (error.status === 404) { blocksByActivity.set(row.id, []); continue; }
+      notices.push("Some activity recordings could not be refreshed.");
+      if ([401, 403, 429].includes(error.status)) {
+        streamsRetryAt = error.retryAt || Date.now() + 15 * 60000;
+        break;
+      }
+    }
+  }
+  if (pending.length > 8) notices.push("Older activity recordings will be checked on later syncs.");
+  return { blocksByActivity, streamsRetryAt };
+}
+
+const eligibleActivity = (row, oldest, newest) => row.date >= oldest && row.date <= newest
+  && row.minutes >= 13 && Number.isFinite(row.start) && ["Cycling", "Running"].includes(row.sport);
+
+export async function syncGarmin(auth, now, request = fetch, previous) {
   const { oldest, reportDate } = dateRange(now);
   const issued = await read(garmin + "/personalapitoken-service/personal-api/personal-api-key/token",
     { method: "POST", headers: { Accept: "*/*", Authorization: "ApiKey " + auth.value } }, request, "text");
@@ -153,7 +213,7 @@ export async function syncGarmin(auth, now, request = fetch) {
       const values = await get("/sleep-service/sleep/dailySleepSummariesByDate", { startDate, endDate });
       for (const item of rows(values, "dailySleepSummaries")) {
         const row = item.dailySleepDTO ?? item;
-        add(day(row.calendarDate), { sleepMinutes: scale(row.sleepTimeSeconds, 1 / 60), sleepScore: number(row.sleepScores?.overall?.value) });
+        add(day(row.calendarDate), sleepReading(row));
       }
     });
     await loadWellness("HRV", async () => {
@@ -168,15 +228,48 @@ export async function syncGarmin(auth, now, request = fetch) {
     if (list.length < 100) break;
     if (start === 400) notices.push("Garmin activity limit reached. The range is partial.");
   }
-  return { wellness: [...byDate.values()], activities, notices: [...new Set(notices)] };
+  const candidates = activities.filter(row => eligibleActivity(row, oldest, reportDate) && /^\d+$/.test(row.id));
+  const recording = await collectEfforts(candidates, previous, notices, async row => {
+    const file = await read(garmin + "/download-service/files/activity/" + row.id,
+      { headers: { Authorization: "Bearer " + token, Accept: "*/*" } }, request, "binary");
+    return file ? fitEfforts(row, file) : [];
+  });
+  return { wellness: [...byDate.values()], activities, ...recording, notices: [...new Set(notices)],
+    efforts: [...recording.blocksByActivity.values()].flat() };
 }
 
-export async function syncIntervals(auth, now, request = fetch) {
+export async function syncIntervals(auth, now, request = fetch, previous) {
   const { oldest, reportDate } = dateRange(now);
   const Authorization = auth.kind === "oauth" ? "Bearer " + auth.value : "Basic " + Buffer.from("API_KEY:" + auth.value).toString("base64");
-  const get = category => read(intervals + "/api/v1/athlete/0/" + category + "?" + new URLSearchParams({ oldest, newest: reportDate }),
+  const get = (path, params = {}) => read(intervals + "/api/v1/" + path + "?" + new URLSearchParams(params),
     { headers: { Authorization } }, request);
-  const [wellness, workouts] = await Promise.all([get("wellness"), get("activities")]);
+  const range = { oldest, newest: reportDate };
+  const [wellness, workouts] = await Promise.all([get("athlete/0/wellness", range), get("athlete/0/activities", range)]);
+  const activityRows = rows(workouts);
+  const activities = activityRows.map(row => activity(row, sources.intervals)).filter(Boolean);
+  const eligible = new Set(activityRows.filter(row => sportType(row.type) === "Running" || row.device_watts === true).map(row => String(row.id)));
+  const candidates = activities.filter(row => eligibleActivity(row, oldest, reportDate) && row.environment && eligible.has(row.id));
+  const notices = [];
+  let { blocksByActivity, streamsRetryAt } = await collectEfforts(candidates, previous, notices, async row => {
+    const types = "time,heartrate," + (row.sport === "Cycling" ? "watts" : "velocity_smooth");
+    return steadyEfforts(row, await get("activity/" + encodeURIComponent(row.id) + "/streams.json", { types }));
+  });
+  let calendar = previous?.calendar?.filter(row => row.date >= reportDate) ?? [];
+  if (auth.kind === "key" && Date.now() >= streamsRetryAt) {
+    try {
+      const newest = new Date(Date.parse(reportDate) + 6 * 86400000).toISOString().slice(0, 10);
+      calendar = rows(await get("athlete/0/events", { oldest: reportDate, newest, category: "WORKOUT" })).flatMap(row => {
+        const date = day(row.start_date_local), sport = sportType(row.type);
+        if (!date || row.category !== "WORKOUT" || !["Cycling", "Running"].includes(sport) || row.id == null) return [];
+        return [{ id: String(row.id), date, sport, name: typeof row.name === "string" ? row.name.slice(0, 160) : sport,
+          minutes: scale(row.workout_doc?.duration ?? row.moving_time, 1 / 60) }];
+      });
+    } catch (error) {
+      if ([401, 403].includes(error.status)) calendar = [];
+      if (error.status === 429) streamsRetryAt = error.retryAt || Date.now() + 15 * 60000;
+      notices.push("Intervals.icu calendar is unavailable on this sync.");
+    }
+  }
   return {
     wellness: rows(wellness).flatMap(row => {
       const date = day(row.id);
@@ -184,8 +277,8 @@ export async function syncIntervals(auth, now, request = fetch) {
       return date ? [{ date, source: sources.intervals, fitness, fatigue,
         form: fitness != null && fatigue != null ? fitness - fatigue : null }] : [];
     }),
-    activities: rows(workouts).map(row => activity(row, sources.intervals)).filter(Boolean),
-    notices: [],
+    activities, calendar, blocksByActivity, streamsRetryAt, notices,
+    efforts: [...blocksByActivity.values()].flat(),
   };
 }
 

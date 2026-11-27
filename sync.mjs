@@ -12,7 +12,8 @@ const providerIds = Object.keys(sources);
 const periods = { garmin: inMinutes(60), intervals: inMinutes(15) };
 const readers = { garmin: syncGarmin, intervals: syncIntervals };
 const files = { "/": "index.html", "/index.html": "index.html", "/styles.css": "styles.css",
-  "/data.js": "data.js", "/dashboard.js": "dashboard.js", "/connections.js": "connections.js", "/panels.js": "panels.js", "/fonts/dm-sans-latin.woff2": "fonts/dm-sans-latin.woff2" };
+  "/data.js": "data.js", "/adaptive.js": "adaptive.js", "/dashboard.js": "dashboard.js", "/connections.js": "connections.js",
+  "/panels.js": "panels.js", "/fonts/dm-sans-latin.woff2": "fonts/dm-sans-latin.woff2" };
 const types = { html: "text/html; charset=utf-8", css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
 const localOrigin = port => "http://127.0.0.1:" + port;
 const headers = {
@@ -101,7 +102,7 @@ export async function createSyncServer({ port = 4176, directory = join(base, ".p
     if (busy.has(provider)) return busy.get(provider);
     if (!credential || connecting.has(provider) || Date.now() < (state.allowedAfter ?? 0)
       || (!manual && Date.now() < (state.next ?? 0))) return Promise.resolve();
-    const task = readers[provider](credential, new Date(), request).then(snapshot => {
+    const task = readers[provider](credential, new Date(), request, cache.get(provider)).then(snapshot => {
       if (credentials[provider] === credential) update(provider, snapshot);
     }, error => {
       if (credentials[provider] !== credential) return;

@@ -7,6 +7,7 @@
   <title>Performance Desk Starter</title>
   <link rel="stylesheet" href="styles.css">
   <script src="data.js" defer></script>
+  <script src="adaptive.js" defer></script>
   <script src="panels.js" defer></script>
   <script src="dashboard.js" defer></script>
   <script src="connections.js" defer></script>
@@ -18,15 +19,7 @@
       <button type="button" data-view="daily" aria-current="page">Daily</button>
       <button type="button" data-view="trends">Trends</button>
       <button type="button" data-view="archive">Archive</button>
-      <details id="additional-views" hidden>
-        <summary>More</summary>
-        <div class="additional-views">
-          <button type="button" data-view="benchmarks" hidden>Benchmarks</button>
-          <button type="button" data-view="predictions" hidden>Predictions</button>
-          <button type="button" data-view="plan" hidden>Plan</button>
-          <button type="button" data-view="reference" hidden>Reference</button>
-        </div>
-      </details>
+      <button type="button" data-view="reference" hidden>Reference</button>
     </nav>
     <button type="button" id="show-connections">Connect accounts</button>
     <label class="import">Open report file <input type="file" id="report-input" accept=".json,application/json"></label>
@@ -34,22 +27,12 @@
   <main class="frame">
     <div id="feedback" role="status" aria-live="polite"></div>
     <section id="daily" aria-labelledby="daily-title">
-      <div class="page-heading"><h1 id="daily-title">Daily</h1><span id="report-date"></span></div>
+      <div class="page-heading"><h1 id="daily-title">Daily</h1><time id="report-date"></time></div>
       <div id="daily-content"></div>
     </section>
     <section id="trends" aria-labelledby="trends-title" hidden>
       <div class="page-heading"><h1 id="trends-title">Trends</h1></div>
       <div id="trends-content"></div>
-    </section>
-    <section id="predictions" aria-labelledby="predictions-title" hidden>
-      <div class="page-heading"><h1 id="predictions-title">Performance predictions</h1></div>
-      <div id="predictions-content"></div>
-    </section>
-    <section id="benchmarks" aria-labelledby="benchmarks-title" hidden>
-      <div class="page-heading"><h1 id="benchmarks-title">Benchmarks</h1></div><div id="benchmarks-content"></div>
-    </section>
-    <section id="plan" aria-labelledby="plan-title" hidden>
-      <div class="page-heading"><h1 id="plan-title">Plan</h1></div><div id="plan-content"></div>
     </section>
     <section id="archive" aria-labelledby="archive-title" hidden>
       <div class="page-heading"><h1 id="archive-title">Archive</h1></div><div id="archive-content"></div>

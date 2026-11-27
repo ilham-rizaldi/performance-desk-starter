@@ -2,9 +2,15 @@
   "name": "performance-desk-starter",
   "private": true,
   "version": "1.1.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node sync.mjs",
     "test": "node --test sync.test.mjs"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "21.222.0",
+    "fflate": "0.8.3"
   }
 }
