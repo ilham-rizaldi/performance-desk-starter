@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Performance Desk Starter</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js" defer></script>
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <header class="bar"><div class="frame header-row">
+    <a class="brand" href="./">Performance Desk</a>
+    <nav aria-label="Dashboard views">
+      <button type="button" data-view="daily" aria-current="page">Daily</button>
+      <button type="button" data-view="trends">Trends</button>
+      <button type="button" data-view="predictions">Predictions</button>
+    </nav>
+    <label class="import">Open report file <input type="file" id="report-input" accept=".json,application/json"></label>
+  </div></header>
+  <main class="frame">
+    <div id="feedback" role="status" aria-live="polite"></div>
+    <section id="daily" aria-labelledby="daily-title">
+      <div class="page-heading"><h1 id="daily-title">Daily</h1><span id="report-date"></span></div>
+      <div id="daily-content"></div>
+    </section>
+    <section id="trends" aria-labelledby="trends-title" hidden>
+      <div class="page-heading"><h1 id="trends-title">Trends</h1></div>
+      <div id="trends-content"></div>
+    </section>
+    <section id="predictions" aria-labelledby="predictions-title" hidden>
+      <div class="page-heading"><h1 id="predictions-title">Predictions</h1></div>
+      <div id="predictions-content"></div>
+    </section>
+  </main>
+  <dialog id="details" aria-labelledby="detail-title">
+    <div class="dialog-head"><h2 id="detail-title"></h2><form method="dialog"><button>Close</button></form></div>
+    <div id="detail-content"></div>
+  </dialog>
+  <noscript>Turn on JavaScript to open a report file in this browser.</noscript>
+</body>
+</html>

@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+.private/
+private/
+exports/
+downloads/
+*.fit
+*.tcx
+*.gpx
+*.csv
+*.zip
+*.private.json
+performance-report*.json

@@ -1,0 +1,23 @@
+# Prompt instalasi Performance Desk
+
+Salin teks di dalam kotak ini ke chat pribadi milik Anda.
+
+```text
+Saya ingin membangun Performance Desk pribadi dengan template kosong dari https://github.com/ilham-rizaldi/performance-desk-starter. Mulai sekarang dengan membuka repo tersebut, membaca README.md dan DATA-FORMAT.md, lalu bantu jalankan dashboard. Gunakan Bahasa Indonesia yang mudah dipahami. Kerjakan langkah teknis yang bisa Anda kerjakan. Beri saya satu tindakan pada satu waktu saat Anda perlu saya klik atau masuk ke akun.
+
+1. Siapkan salinan template di ruang kerja saya. Buka index.html dan periksa Daily, Trends, Predictions, serta Open report file. Jika chat ini hanya bisa membaca file, arahkan saya memakai Code → Download ZIP dan membuka index.html. Beri status yang sudah benar-benar berhasil. Gunakan folder saya sendiri. Jangan gunakan data, akun, pengaturan zona, atau konfigurasi pemilik repo template.
+
+2. Tanyakan zona waktu saya sekali jika belum diketahui. Tawarkan Garmin Connect, Intervals.icu, dan Strava sebagai sumber. Jika alat browser atau konektor resmi tersedia, buka halaman resmi masing-masing dan biarkan saya masuk sendiri. Minta izin hanya untuk sumber dan akses yang dibutuhkan. Periksa bahwa tiap akun benar-benar sudah masuk sebelum melaporkan akses berhasil. Jika browser atau akun tidak tersedia, pandu saya memakai ekspor resmi. Gunakan akun saya dalam mode baca saja. Jangan meminta password, kode verifikasi, API key, atau token untuk dikirim lewat chat. Jangan mengubah, mengunggah, menjadwalkan, atau menulis data ke akun olahraga.
+
+3. Kumpulkan ringkasan aktivitas 42 hari yang benar-benar tersedia. Gunakan Garmin untuk data perangkat, recovery, sleep dan acute/chronic load. Gunakan Intervals.icu untuk Fitness, Fatigue, Form, dan bukti aktivitasnya. Gunakan Strava untuk memeriksa riwayat, aktivitas, dan catatan waktu yang tersedia. Pakai periode masing-masing sumber secara eksplisit. Jika hari ini baru berjalan sebagian, catat sebagai pembacaan saat ini. Akun yang belum dihubungkan boleh dilewati. Sampaikan cakupannya. Jangan membuat nilai atau mengisi celah dengan nol.
+
+4. Jangan gandakan sesi yang sama. Cocokkan ID lintas platform jika ada. Jika tidak ada, cocokkan waktu mulai, jenis olahraga, durasi timer dan jarak. Gunakan sessionKey yang sama hanya untuk salinan yang terverifikasi. Pertahankan perbedaan penting antarsumber. Untuk Indoor dan Outdoor, gunakan jenis aktivitas yang terverifikasi. Untuk strength, jumlahkan beban setiap set yang tercatat dikali repetisi. Jika set atau beban tidak diketahui, biarkan totalnya kosong. Gunakan data power yang benar-benar tercatat dan pisahkan power perkiraan.
+
+5. Buat file performance-report.json yang sesuai dengan DATA-FORMAT.md, dengan tanggal, zona waktu, dan sumber tiap baris. Tambahkan efforts hanya untuk blok steady terukur pada saat yang sama, dengan watt dan HR untuk cycling, atau pace dan HR untuk running. Gunakan 8–15 menit sebagai jendela model starter. Jangan gunakan rerata seluruh sesi sebagai pengganti blok. Berikan nilai peakHR hanya ketika puncak HR benar-benar tercatat di blok tersebut. Jaga perbedaan indoor dan outdoor. Jika tidak ada bukti, biarkan array efforts kosong. Sebutkan data yang masih perlu direkam dengan jelas.
+
+6. Uji file dengan membuka Dashboard → Open report file. Bila Anda bisa mengoperasikan browser, periksa nilai, menu, grafik, dan tabel dengan data saya pada tampilan pribadi saja. Bila tidak bisa, berikan file siap unduh dan langkah membuka file. Bantu saya membaca satu implikasi latihan yang didukung data. Jika recovery sudah lama atau tidak utuh, jangan beri target intensitas hari ini. Gunakan perkiraan pacing hanya dengan bukti yang cukup dan pertahankan batas penggunaannya.
+
+7. Simpan file laporan dan ekspor di folder pribadi, terpisah dari kode publik. Jangan publikasikan data pribadi saya, akses akun, atau tautan laporan ke GitHub atau situs publik. Jika saya nanti meminta tampilan lintas perangkat, ajukan opsi hosting privat dan jelaskan siapa yang bisa mengakses sebelum menyimpan data atau menerbitkan laporan.
+
+Akhiri dengan status Garmin Connect, Intervals.icu dan Strava, tanggal dan rentang data yang berhasil diverifikasi, serta satu langkah menyegarkan laporan berikutnya. Bedakan akses telah diuji, data benar-benar diimpor, dan sinkronisasi terjadwal jika memang ada. Jangan menyebut langkah yang belum diuji sudah berfungsi.
+```
