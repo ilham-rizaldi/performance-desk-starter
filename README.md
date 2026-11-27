@@ -36,6 +36,7 @@ Saat ingin memperbarui laporan, kirim **“Perbarui Performance Desk saya dengan
 - **Daily** menampilkan recovery, metrik Garmin, Fitness Intervals.icu, dan saran latihan ringan bila pembacaan recovery berasal dari hari yang sama.
 - **Trends** menampilkan kecepatan cycling dan pace running, dengan filter Indoor dan Outdoor. Strength menampilkan total kg untuk sesi yang mencatat beban.
 - **Predictions** menampilkan perkiraan HR pada target watt atau pace, dan referensi dari latihan yang sebelumnya berada di bawah batas HR. Estimasi memerlukan data berpasangan yang sebanding. Kolom kosong berarti bukti belum cukup.
+- **Benchmarks, Plan, Archive, dan Reference** menampilkan rekaman pribadi, rencana yang tersimpan, riwayat, dan dasar pembacaan. Bagian ini bertambah ketika arsip Performance Desk tersedia.
 - **Details** membuka grafik di atas tabel sumber dan tanggal. Grafik mengikuti pembacaan yang tersedia.
 
 ## Privasi dan batas integrasi

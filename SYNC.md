@@ -35,3 +35,8 @@ Jika pengelola instalasi sudah memiliki aplikasi OAuth yang disetujui Intervals.
 | **Access expired or was denied** | Klik **Reconnect**. Pakai key baru bila key sudah kedaluwarsa. |
 | **Last synced** masih menunjukkan waktu lama | Cek koneksi internet dan pastikan aplikasi lokal masih berjalan. Pilih **Sync now** setelah jeda dari sumber selesai. |
 | Halaman browser hanya menampilkan starter kosong | Buka alamat aplikasi privat di langkah 1. Halaman GitHub adalah preview. |
+
+
+## Jika sudah punya arsip Performance Desk
+
+Di komputer sendiri, minta Codex menjalankan `node reference.mjs /lokasi/arsip-performance-desk-pribadi.json`, kemudian restart aplikasi lokal. Impor ini memetakan data Garmin dan Intervals.icu dari arsip ke kartu Training Load, Training Status, Pacing, Benchmarks, Plan, Archive, dan Reference. Pembacaan API yang tersedia untuk tanggal dan sumber yang sama mengisi kartu lebih dahulu. Arsip tetap berada di `.private/` dan sumbernya perlu terhubung agar data tampil. Untuk pemilik starter baru, langkah impor ini opsional.

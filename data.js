@@ -7,6 +7,8 @@
     readiness: [0, 100], bodyBattery: [0, 100], sleepScore: [0, 100], sleepMinutes: [0, 1440],
     restingHR: [1, 300], hrv: [1, 500], recoveryHours: [0, 240],
     acuteLoad: [0, 50000], chronicLoad: [0, 50000], loadRatio: [0, 25],
+    bodyBatteryHigh: [0, 100], bodyBatteryLow: [0, 100], vo2: [1, 120], heat: [0, 100], hrv7d: [1, 500],
+    optimalLow: [0, 50000], optimalHigh: [0, 50000],
     fitness: [0, 1000], fatigue: [0, 1000], form: [-1000, 1000],
   };
 
@@ -29,9 +31,11 @@
 
     const observed = row => row && validDate(row.date) && row.date <= raw.reportDate && providers.includes(row.source);
     const byDate = (left, right) => left.date.localeCompare(right.date);
+    const labels = ["trainingStatus", "loadFocusStatus", "trainingStatusSince", "hrvStatus", "readinessStatus", "sleepStatus", "loadStatus"];
     const wellness = raw.wellness.filter(observed).map(row => ({
       date: row.date,
       source: row.source,
+      ...Object.fromEntries(labels.map(key => [key, typeof row[key] === "string" ? row[key] : null])),
       ...Object.fromEntries(Object.entries(metricRanges).map(([key, [low, high]]) => [key, number(row[key], low, high)])),
     })).sort(byDate);
 
@@ -43,7 +47,7 @@
         ? JSON.stringify([row.date, row.sport, row.sessionKey.trim()]) : JSON.stringify([row.source, row.id.trim()]);
       const previous = sessions.get(key);
       const session = {
-        date: row.date, sport: row.sport, id: row.id, source: row.source,
+        date: row.date, sport: row.sport, id: row.id, source: row.source, name: typeof row.name === "string" ? row.name : null,
         environment: ["Indoor", "Outdoor"].includes(row.environment) ? row.environment : null,
         minutes: number(row.minutes, 0.1, 4320), km: number(row.km, 0.01, 1000),
         avgWatts: number(row.avgWatts, 1, 1500), avgHR: number(row.avgHR, 30, 260),
@@ -54,7 +58,7 @@
         continue;
       }
       if (!previous.sources.includes(row.source)) previous.sources.push(row.source);
-      for (const name of ["environment", "minutes", "km", "avgWatts", "avgHR", "liftedKg"]) previous[name] ??= session[name];
+      for (const name of ["name", "environment", "minutes", "km", "avgWatts", "avgHR", "liftedKg"]) previous[name] ??= session[name];
     }
     const effortKeys = new Set();
     const efforts = [];
@@ -70,7 +74,7 @@
       effortKeys.add(key);
       efforts.push({ date: row.date, sport: row.sport, source: row.source, environment: row.environment, bpm, peakHR, minutes, effort });
     }
-    return { date: raw.reportDate, timezone: raw.timezone, wellness, activities: [...sessions.values()].sort(byDate), efforts: efforts.sort(byDate) };
+    return { date: raw.reportDate, timezone: raw.timezone, wellness, activities: [...sessions.values()].sort(byDate), efforts: efforts.sort(byDate), context: raw.context && typeof raw.context === "object" ? raw.context : null };
   }
 
   function median(values) {

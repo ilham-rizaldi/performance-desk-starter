@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { createSyncServer } from "./sync.mjs";
 import { buildReport, dateRange, syncGarmin, syncIntervals } from "./providers.mjs";
 import "./data.js";
+import { combineReference, projectReference } from "./reference.mjs";
 
 const { reportDate: date } = dateRange();
 const garminActivity = { activityId: 41, activityType: { typeKey: "road_biking" },
@@ -75,6 +76,24 @@ test("manual reports accept only the same two providers as automatic sync", () =
   });
   assert.deepEqual(providers, ["Garmin Connect", "Intervals.icu"]);
   assert.deepEqual(report.activities.map(row => row.source), providers);
+});
+
+test("a private archive fills historical gaps without replacing live readings or reopening a disconnected source", () => {
+  const reference = projectReference({
+    schemaVersion: 1, date, wellness: { date, restingHr: 51, readiness: 74, bodyBattery: 70 },
+    intervals: { date, fitness: 31, fatigue: 36 },
+    activities: [{ date, source: "Garmin Connect", sport: "Ride", externalIds: { garmin: "41" }, name: "Archive ride", timerSeconds: 3600 }],
+  });
+  const live = {
+    version: 1, reportDate: date, timezone: "UTC", wellness: [{ date, source: "Garmin Connect", restingHR: 49, readiness: null }],
+    activities: [{ date, source: "Garmin Connect", sport: "Cycling", id: "41", minutes: 59 }],
+    efforts: [],
+  };
+  const merged = combineReference(live, reference, ["Garmin Connect"]);
+  assert.deepEqual(merged.wellness.map(row => [row.restingHR, row.readiness]), [[49, 74]]);
+  assert.deepEqual(merged.activities.map(row => [row.name, row.minutes]), [["Archive ride", 59]]);
+  assert.equal(merged.context.date, date);
+  assert.equal(combineReference({ ...live, wellness: [], activities: [] }, reference, ["Intervals.icu"]).context, undefined);
 });
 
 test("authorizes both routes, rejects unsafe origins and removes the disconnected data", async t => {

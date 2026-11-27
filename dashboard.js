@@ -2,7 +2,7 @@
   "use strict";
   const model = globalThis.PerformanceData;
   const element = id => document.getElementById(id);
-  const metricColors = { cyan: "#55e3f0", pink: "#ff7bad", green: "#79eeae", violet: "#bb9cff", amber: "#ffca7d" };
+  const metricColors = { cyan: "#56e8f4", pink: "#ff77a8", green: "#7aefa8", violet: "#be9cff", amber: "#ffc572" };
   let report = null;
   let mode = null;
 
@@ -33,7 +33,8 @@
     return match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
   }
 
-  function graphic(rows, { color = "cyan", format = fmt, label } = {}) {
+  function graphic(rows, { color = "cyan", format = fmt, label, overlay = [], overlayColor = "amber", band = [] } = {}) {
+    if (!rows.length && overlay.length) return graphic(overlay, { color: overlayColor, format, label });
     if (!rows.length) return node("p", "No recorded values for this chart.", "muted");
     const output = node("div");
     const canvas = node("canvas", null, "chart");
@@ -44,13 +45,13 @@
     canvas.setAttribute("aria-label", (label || "History") + ". Use arrow keys for recorded values.");
     const context = canvas.getContext("2d");
     const timestamps = rows.map(row => Date.parse(row.date));
-    const values = rows.map(row => row.value);
-    const xMin = timestamps[0], xMax = timestamps.at(-1);
+    const allDates = [...timestamps, ...overlay.map(row => Date.parse(row.date)), ...band.map(row => Date.parse(row.date))];
+    const values = [...rows.map(row => row.value), ...overlay.map(row => row.value), ...band.flatMap(row => [row.low, row.high])];
+    const xMin = Math.min(...allDates), xMax = Math.max(...allDates);
     const yMin = Math.min(...values), yMax = Math.max(...values);
-    const points = rows.map((row, index) => [
-      xMin === xMax ? 330 : 20 + 620 * (timestamps[index] - xMin) / (xMax - xMin),
-      yMin === yMax ? 85 : 145 - 120 * (row.value - yMin) / (yMax - yMin),
-    ]);
+    const xAt = date => xMin === xMax ? 330 : 20 + 620 * (Date.parse(date) - xMin) / (xMax - xMin);
+    const yAt = value => yMin === yMax ? 85 : 145 - 120 * (value - yMin) / (yMax - yMin);
+    const points = rows.map(row => [xAt(row.date), yAt(row.value)]);
     let selected = points.length - 1;
     function draw() {
       context.clearRect(0, 0, 660, 170);
@@ -60,6 +61,22 @@
         context.beginPath();
         context.moveTo(18, y);
         context.lineTo(642, y);
+        context.stroke();
+      }
+      if (band.length > 1) {
+        context.fillStyle = "#7aefa828";
+        context.setLineDash([]);
+        context.beginPath();
+        band.forEach((row, i) => i ? context.lineTo(xAt(row.date), yAt(row.high)) : context.moveTo(xAt(row.date), yAt(row.high)));
+        [...band].reverse().forEach(row => context.lineTo(xAt(row.date), yAt(row.low)));
+        context.closePath();
+        context.fill();
+      }
+      if (overlay.length) {
+        context.strokeStyle = metricColors[overlayColor];
+        context.setLineDash([3, 5]);
+        context.beginPath();
+        overlay.forEach((row, i) => i ? context.lineTo(xAt(row.date), yAt(row.value)) : context.moveTo(xAt(row.date), yAt(row.value)));
         context.stroke();
       }
       context.setLineDash([]);
@@ -124,7 +141,7 @@
   }
 
   function detailsButton(panel, title, rows, options) {
-    const details = node("button", "Details", "history-button");
+    const details = node("button", "+ Details", "history-button");
     details.type = "button";
     details.setAttribute("aria-label", "Details for " + title);
     details.addEventListener("click", () => showHistory(title, rows, options));
@@ -143,10 +160,11 @@
     const panel = card(label);
     const rows = valuesFor(field, source);
     const latest = rows.at(-1);
-    const readout = node("p", fmt(latest?.value), "metric");
+    const sleepTime = field === "sleepMinutes" && latest;
+    const readout = node("p", sleepTime ? Math.floor(latest.value / 60) + "h " + Math.round(latest.value % 60) + "m" : fmt(latest?.value), "metric");
     readout.style.setProperty("--accent", metricColors[color]);
-    if (latest && unit) readout.append(node("small", unit));
-    panel.append(readout, node("small", latest ? source + " · " + latest.date : "Waiting for " + source + " data"));
+    if (latest && unit && !sleepTime) readout.append(node("small", unit));
+    panel.append(readout, node("small", latest ? latest.date : "No recorded reading"));
     const options = { color, unit: label + (unit ? " (" + unit + ")" : "") };
     if (chart && rows.length) panel.append(graphic(rows, options));
     if (field === "readiness" && latest) {
@@ -164,43 +182,7 @@
     const content = element("daily-content");
     content.replaceChildren();
     element("report-date").textContent = report ? ("Report · " + report.date) : "";
-    if (!report) {
-      const blank = card("No report open", "empty");
-      blank.append(node("p", "Open a private report file to see recovery, training load and recent workouts.", "muted"));
-      const links = node("div", null, "source-links");
-      for (const [title, url] of [["Garmin Connect", "https://connect.garmin.com/"], ["Intervals.icu", "https://intervals.icu/"]]) {
-        const link = node("a", title);
-        link.href = url;
-        link.target = "_blank";
-        link.rel = "noreferrer";
-        links.append(link);
-      }
-      blank.append(links, node("small", "The report file stays in this browser session."));
-      content.append(blank);
-    } else {
-      const summary = card("Workout suggestion", "empty");
-      const readiness = valuesFor("readiness", "Garmin Connect").at(-1);
-      const recovery = valuesFor("recoveryHours", "Garmin Connect").at(-1);
-      if (report.date !== model.currentDate(report.timezone) || readiness?.date !== report.date || recovery?.date !== report.date) {
-        summary.append(node("p", "Use this as training history. A session suggestion needs current readiness and recovery readings.", "muted"));
-      } else {
-        const caution = readiness.value < 50 || recovery.value > 12;
-        summary.append(node("h3", caution ? "Rest or keep it easy" : "Start with an easy warm-up"),
-          node("p", "Readiness " + fmt(readiness.value) + "/100 · Recovery time " + fmt(recovery.value) + " h. Adjust to how you feel during the warm-up.", "muted"));
-      }
-      content.append(summary);
-    }
-    const grid = node("div", null, "grid");
-    const g = "Garmin Connect", i = "Intervals.icu";
-    for (const config of [
-      ["Readiness","readiness","/100","pink",g,false], ["Body Battery","bodyBattery","/100","cyan",g],
-      ["Resting HR","restingHR","bpm","pink",g], ["HRV","hrv","ms","green",g],
-      ["Sleep","sleepMinutes","min","cyan",g], ["Sleep score","sleepScore","/100","violet",g], ["Recovery time","recoveryHours","h","green",g],
-      ["Acute load","acuteLoad","","cyan",g], ["Chronic load","chronicLoad","","amber",g],
-      ["Load ratio","loadRatio","","violet",g], ["Fitness","fitness","","cyan",i],
-      ["Fatigue","fatigue","","violet",i], ["Form","form","","green",i],
-    ]) grid.append(metric(...config));
-    content.append(grid);
+    content.append(...panels.daily());
   }
 
   function showTrends() {
@@ -241,7 +223,7 @@
       panel.append(view);
       grid.append(panel);
     }
-    list.append(grid);
+    list.append(...panels.trends(), grid);
   }
 
   function showPredictions() {
@@ -272,7 +254,8 @@
       const outcome = node("div", null, "stack");
       function update() {
         const rows = model.matchingEfforts(report?.efforts || [], sport, environment.value);
-        const predicted = model.hrEstimate(rows, ride ? target.valueAsNumber : parsePace(target.value), sport);
+        const entered = ride ? target.valueAsNumber : parsePace(target.value);
+        const predicted = model.hrEstimate(rows, entered, sport);
         const atCeiling = model.ceilingReference(rows, ceiling.valueAsNumber, sport);
         const output = predicted ? predicted.bpm + " bpm" : "—";
         const boundary = atCeiling?.reference;
@@ -289,6 +272,26 @@
           color: "pink", format: value => fmt(value) + " bpm", columns: ["Date", "Effort", "Time", "HR", "Peak HR", "Source"],
           row: row => [row.date, formatEffort(row.effort), fmt(row.minutes) + " min", fmt(row.bpm) + " bpm", fmt(row.peakHR), row.source],
         });
+        const byDate = new Map();
+        for (const row of history) {
+          const previous = byDate.get(row.date);
+          if (!previous || Number.isFinite(entered) && Math.abs(row.effort - entered) < Math.abs(previous.effort - entered)) byDate.set(row.date, row);
+        }
+        const actual = [...byDate.values()];
+        const audit = actual.map(row => {
+          const prior = rows.filter(previous => previous.date < row.date);
+          return { ...row, expected: model.hrEstimate(prior, row.effort, sport)?.bpm };
+        });
+        const expected = audit.filter(row => Number.isFinite(row.expected)).map(row => ({ date: row.date, value: row.expected }));
+        const panel = node("div", null, "prediction-audit");
+        panel.append(node("h3", "Predicted vs actual HR"), node("small", expected.length
+          ? expected.length + " days with earlier comparable data"
+          : "Earlier comparable efforts are needed for a prediction check."));
+        if (actual.length) panel.append(graphic(actual, { label: "Predicted and actual heart rate", color: "pink", overlay: expected, overlayColor: "cyan" }));
+        detailsButton(panel, sport + " HR comparison", audit, { color: "pink", overlay: expected, overlayColor: "cyan",
+          columns: ["Date", "Effort", "Actual HR", "Predicted HR", "Source"],
+          row: row => [row.date, formatEffort(row.effort), fmt(row.bpm) + " bpm", row.expected == null ? "—" : fmt(row.expected) + " bpm", row.source] });
+        outcome.append(panel);
       }
       for (const control of [environment, target, ceiling]) control.addEventListener("input", update);
       update();
@@ -298,7 +301,15 @@
     root.append(grid);
   }
 
-  function render() { showDaily(); showTrends(); showPredictions(); }
+  const panels = globalThis.PerformancePanels({ node, card, fmt, pace, graphic, metric, valuesFor, showHistory, detailsButton,
+    getReport: () => report, currentDate: model.currentDate, colors: metricColors });
+
+  function render() {
+    showDaily(); showTrends(); showPredictions();
+    for (const name of ["benchmarks", "plan", "archive", "reference"]) {
+      element(name + "-content").replaceChildren(...panels[name]());
+    }
+  }
   for (const button of document.querySelectorAll("[data-view]")) {
     button.addEventListener("click", () => {
       const selected = button.dataset.view;

@@ -4,6 +4,7 @@ import { readFile, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildReport, exchangeIntervals, revokeIntervals, sources, syncGarmin, syncIntervals } from "./providers.mjs";
+import { combineReference } from "./reference.mjs";
 
 const base = fileURLToPath(new URL(".", import.meta.url));
 const inMinutes = minutes => minutes * 60000;
@@ -11,8 +12,8 @@ const providerIds = Object.keys(sources);
 const periods = { garmin: inMinutes(60), intervals: inMinutes(15) };
 const readers = { garmin: syncGarmin, intervals: syncIntervals };
 const files = { "/": "index.html", "/index.html": "index.html", "/styles.css": "styles.css",
-  "/data.js": "data.js", "/dashboard.js": "dashboard.js", "/connections.js": "connections.js" };
-const types = { html: "text/html; charset=utf-8", css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8" };
+  "/data.js": "data.js", "/dashboard.js": "dashboard.js", "/connections.js": "connections.js", "/panels.js": "panels.js", "/fonts/dm-sans-latin.woff2": "fonts/dm-sans-latin.woff2" };
+const types = { html: "text/html; charset=utf-8", css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
 const localOrigin = port => "http://127.0.0.1:" + port;
 const headers = {
   "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
@@ -44,6 +45,9 @@ export async function createSyncServer({ port = 4176, directory = join(base, ".p
   client = { id: process.env.INTERVALS_CLIENT_ID, secret: process.env.INTERVALS_CLIENT_SECRET } } = {}) {
   const statePath = join(directory, "connections.json");
   let credentials = {};
+  let reference;
+  try { reference = JSON.parse(await readFile(join(directory, "performance-desk-reference.json"), "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") console.error("The saved Performance Desk archive could not be read."); }
   try {
     const saved = JSON.parse(await readFile(statePath, "utf8"));
     for (const provider of providerIds) {
@@ -114,7 +118,7 @@ export async function createSyncServer({ port = 4176, directory = join(base, ".p
       connections: providerIds.map(id => ({ id, name: sources[id], connected: Boolean(credentials[id]),
         syncing: busy.has(id) || connecting.has(id), lastSync: status(id).lastSync, error: status(id).error,
         notices: cache.get(id)?.notices ?? [], oauth: id === "intervals" && Boolean(client.id) })),
-      report: cache.size ? buildReport(cache, new Date(Math.max(...[...cache.keys()].map(id => Date.parse(status(id).lastSync))))) : null,
+      report: cache.size ? combineReference(buildReport(cache, new Date(Math.max(...[...cache.keys()].map(id => Date.parse(status(id).lastSync))))), reference, [...cache.keys()].map(id => sources[id])) : null,
     };
   }
 
