@@ -4,6 +4,7 @@
   const element = id => document.getElementById(id);
   const metricColors = { cyan: "#55e3f0", pink: "#ff7bad", green: "#79eeae", violet: "#bb9cff", amber: "#ffca7d" };
   let report = null;
+  let mode = null;
 
   function node(tag, text, className) {
     const item = document.createElement(tag);
@@ -311,12 +312,25 @@
     element(button.dataset.view + "-title").tabIndex = -1;
   }
 
+  window.addEventListener("performance-desk-live", event => {
+    if (event.detail) {
+      report = model.normalize(event.detail);
+      mode = "live";
+      element("feedback").textContent = "Connected report · " + report.date;
+    } else if (mode === "live") {
+      report = null;
+      mode = null;
+      element("feedback").textContent = "";
+    }
+    render();
+  });
   element("report-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       if (file.size > 10_000_000) throw Error("The report file is too large. Ask GPT for a smaller report.");
       report = model.normalize(JSON.parse(await file.text()));
+      mode = "file";
       render();
       element("feedback").textContent = "Report loaded · " + report.date;
     } catch (error) {

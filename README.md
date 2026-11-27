@@ -2,6 +2,8 @@
 
 Dashboard latihan pribadi untuk cycling, running, dan strength. Template ini mulai kosong. Gunakan data dari akun Anda sendiri.
 
+**Mau pembaruan otomatis tanpa memilih file laporan?** Mulai dari [panduan Connect dan sinkron otomatis](SYNC.md). Mode ini berjalan di aplikasi privat di komputer Anda. Langkah berikut untuk preview dan mode file.
+
 ## Mulai dalam 3 langkah
 
 ### 1. Unduh dan buka dashboard

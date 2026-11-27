@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="styles.css">
   <script src="data.js" defer></script>
   <script src="dashboard.js" defer></script>
+  <script src="connections.js" defer></script>
 </head>
 <body>
   <header class="bar"><div class="frame header-row">
@@ -17,6 +18,7 @@
       <button type="button" data-view="trends">Trends</button>
       <button type="button" data-view="predictions">Predictions</button>
     </nav>
+    <button type="button" id="show-connections">Connect accounts</button>
     <label class="import">Open report file <input type="file" id="report-input" accept=".json,application/json"></label>
   </div></header>
   <main class="frame">
@@ -37,6 +39,18 @@
   <dialog id="details" aria-labelledby="detail-title">
     <div class="dialog-head"><h2 id="detail-title"></h2><form method="dialog"><button>Close</button></form></div>
     <div id="detail-content"></div>
+  </dialog>
+  <dialog id="connections" aria-labelledby="connections-title">
+    <div class="dialog-head"><h2 id="connections-title">Data connections</h2><form method="dialog"><button>Close</button></form></div>
+    <div id="connection-cards" class="stack"></div>
+    <p id="connection-status" role="status" aria-live="polite"></p>
+    <form id="key-form" class="stack" hidden>
+      <a target="_blank" rel="noreferrer">Open provider settings</a>
+      <label for="source-key" id="key-label"></label>
+      <input id="source-key" type="password" autocomplete="off" required maxlength="512" />
+      <button>Connect and sync</button>
+    </form>
+    <button id="sync-now" type="button" hidden>Sync now</button>
   </dialog>
   <noscript>Turn on JavaScript to open a report file in this browser.</noscript>
 </body>
