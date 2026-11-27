@@ -21,9 +21,9 @@ function mockProvider(input, options) {
   switch (url.pathname) {
     case "/personalapitoken-service/personal-api/personal-api-key/token":
       assert.equal(options.headers.Authorization, "ApiKey garmin-test-key");
-      return Response.json({ access_token: "garmin-mock-token" });
+      return new Response("garmin.mock.token\n", { headers: { "Content-Type": "text/plain" } });
     case "/usersummary-service/v2/dailysummaries":
-      return Response.json([{ calendarDate: date, restingHeartRate: 51 }]);
+      return Response.json({ data: [{ calendarDate: date, heartRate: { restingValue: 51 }, bodyBattery: { latestValue: 82, maxValue: 96 } }] });
     case "/sleep-service/sleep/dailySleepSummariesByDate":
       return Response.json([{ calendarDate: date, sleepTimeSeconds: 27000, sleepScores: { overall: { value: 80 } } }]);
     case "/activitylist-service/activities/search/activities":
@@ -45,12 +45,20 @@ function mockProvider(input, options) {
   }
 }
 
+test("rejects a Garmin token response that is not a bearer token", async () => {
+  const request = async () => new Response("<html>Sign in</html>");
+  await assert.rejects(syncGarmin({ value: "test-key" }, new Date(), request),
+    { status: 502, message: "Garmin did not return a usable access token." });
+});
+
 test("builds a dated report with matched sessions, restricted activity sources and no inferred efforts", async () => {
   const g = await syncGarmin({ value: "garmin-test-key" }, new Date(), mockProvider);
   const i = await syncIntervals({ kind: "key", value: "intervals-test-key" }, new Date(), mockProvider);
   const report = buildReport(new Map([["garmin", g], ["intervals", i]]));
   assert.equal(g.wellness[0].sleepMinutes, 450);
   assert.equal(g.wellness[0].hrv, 58);
+  assert.equal(g.wellness[0].restingHR, 51);
+  assert.equal(g.wellness[0].bodyBattery, 82);
   assert.equal(i.wellness[0].form, -5);
   assert.equal(report.activities.length, 2);
   assert.equal(report.activities[0].sessionKey, report.activities[1].sessionKey);
@@ -90,7 +98,7 @@ test("authorizes both routes, rejects unsafe origins and removes the disconnecte
   const body = await connection.json();
   assert.equal(body.connections[0].connected, true);
   assert.equal(body.report.wellness[0].restingHR, 51);
-  assert.doesNotMatch(JSON.stringify(body), /garmin-test-key|garmin-mock-token/);
+  assert.doesNotMatch(JSON.stringify(body), /garmin-test-key|garmin\.mock\.token/);
   assert.match(await readFile(join(directory, "connections.json"), "utf8"), /garmin-test-key/);
   const approved = new URL((await (await post("/api/intervals/authorize", {})).json()).url);
   challenge = approved.searchParams.get("code_challenge");

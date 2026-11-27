@@ -23,7 +23,7 @@ export class SourceError extends Error {
   }
 }
 
-async function read(url, options, request) {
+async function read(url, options, request, format = "json") {
   const response = await request(url, { ...options, redirect: "error", signal: AbortSignal.timeout(12000) });
   if (!response.ok) {
     const retry = response.headers.get("Retry-After");
@@ -33,7 +33,8 @@ async function read(url, options, request) {
       : "The provider could not complete this sync.";
     throw new SourceError(response.status, message, retryAt);
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  return format === "text" ? response.text() : response.json();
 }
 
 function rows(value, key) {
@@ -116,10 +117,13 @@ export function buildReport(cache, now = new Date()) {
 export async function syncGarmin(auth, now, request = fetch) {
   const { oldest, reportDate } = dateRange(now);
   const issued = await read(garmin + "/personalapitoken-service/personal-api/personal-api-key/token",
-    { method: "POST", headers: { Authorization: "ApiKey " + auth.value } }, request);
-  if (!issued?.access_token) throw new SourceError(502, "Garmin did not return an access token.");
+    { method: "POST", headers: { Accept: "*/*", Authorization: "ApiKey " + auth.value } }, request, "text");
+  const token = issued?.trim();
+  if (!token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+    throw new SourceError(502, "Garmin did not return a usable access token.");
+  }
   const get = (path, params = {}) => read(garmin + path + "?" + new URLSearchParams(params),
-    { headers: { Authorization: "Bearer " + issued.access_token } }, request);
+    { headers: { Authorization: "Bearer " + token } }, request);
 
   const byDate = new Map();
   function add(date, fields) {
@@ -137,9 +141,12 @@ export async function syncGarmin(auth, now, request = fetch) {
     }
   }
   for (const [startDate, endDate] of dailyRanges) {
-    await loadWellness("Resting HR", async () => {
-      for (const row of rows(await get("/usersummary-service/v2/dailysummaries", { startDate, endDate }), "dailySummaries")) {
-        add(day(row.calendarDate), { restingHR: number(row.restingHeartRate) });
+    await loadWellness("Resting HR and Body Battery", async () => {
+      for (const row of rows(await get("/usersummary-service/v2/dailysummaries", { startDate, endDate }), "data")) {
+        add(day(row.calendarDate), {
+          restingHR: number(row.heartRate?.restingValue ?? row.restingHeartRate),
+          bodyBattery: number(row.bodyBattery?.latestValue),
+        });
       }
     });
     await loadWellness("Sleep", async () => {

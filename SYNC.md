@@ -23,7 +23,7 @@ Jika pengelola instalasi sudah memiliki aplikasi OAuth yang disetujui Intervals.
 ## 3. Cek pembaruan dan hentikan akses bila perlu
 
 - Pembacaan pertama dimulai setelah koneksi berhasil. Selama aplikasi berjalan, starter mengecek Garmin setiap **60 menit** dan Intervals.icu setiap **15 menit**. Buka **Connect accounts** untuk melihat **Last synced**. Tombol **Sync now** tersedia untuk meminta pemeriksaan lebih awal dan mengikuti jeda dari sumber.
-- Starter membaca hingga **42 hari** termasuk hari ini. Garmin memasok aktivitas, resting HR, HRV dan tidur bila tersedia. Intervals.icu memasok aktivitas dan Fitness/Fatigue. Form dihitung sebagai Fitness dikurangi Fatigue. Aktivitas yang muncul di keduanya dicocokkan hanya ketika waktunya, durasinya, olahraganya dan jaraknya sesuai.
+- Starter membaca hingga **42 hari** termasuk hari ini. Garmin memasok aktivitas, resting HR, Body Battery terakhir, HRV, dan tidur bila tersedia. Intervals.icu memasok aktivitas dan Fitness/Fatigue. Form dihitung sebagai Fitness dikurangi Fatigue. Aktivitas yang muncul di keduanya dicocokkan hanya ketika waktunya, durasinya, olahraganya dan jaraknya sesuai.
 - Prediksi tetap menunggu blok usaha dengan watt atau pace dan HR yang benar-benar berpasangan. Sinkronisasi ringkasan aktivitas ini tidak membuat blok tersebut. Angka tanpa pembacaan tetap kosong. Jika sync gagal, dashboard mempertahankan pembacaan terakhir dan menampilkan status sumbernya.
 - **Disconnect** menghapus koneksi dan data sumber tersebut dari aplikasi. Untuk mencabut key personal di layanan asal, gunakan pengaturan akun Garmin atau Intervals.icu. Simpan key hanya di aplikasi privat di perangkat milik Anda. File pengaturan lokal berada di folder `.private/` yang dikecualikan dari GitHub.
 
